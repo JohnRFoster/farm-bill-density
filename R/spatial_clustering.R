@@ -23,7 +23,7 @@ file <- file.path(data_repo, "insitu/MIS.Effort.Take.All.Methods.Daily.Events.01
 
 all_take <- read_csv(file, show_col_types = FALSE) |>
   select(-`...1`) |>
-  filter(start.date >= lubridate::ymd("2014-01-01")) |>
+  filter(start.date >= lubridate::ymd("2019-01-01")) |>
   mutate(cnty_name = if_else(grepl("ST ", cnty_name), gsub("ST ", "ST. ", cnty_name), cnty_name),
          cnty_name = if_else(grepl("KERN", cnty_name), "KERN", cnty_name)) |>
   mutate(property_area_km2 = round(property.size * 0.00404686, 2)) |>
@@ -50,8 +50,15 @@ postal <- states |>
 
 all_take <- left_join(all_take, postal)
 
+states_model <- c("ARKANSAS", "HAWAII", "LOUISIANA", "MISSOURI", "OKLAHOMA",
+                  "SOUTH CAROLINA", "TEXAS")
+
 fb_take <- left_join(fb_join, all_take) |>
-  filter(!is.na(take))
+  filter(!is.na(take),
+         st_name %in% states_model)
+
+write_csv(fb_take, "data/farmBillTakeGoodStates.csv")
+
 
 # only GA and FL are mismatched - suggests error in lat long reporting
 fb_take |>
@@ -81,7 +88,7 @@ hc <- hclust(tmp)
 
 max_area <- 150
 d <- 2 * sqrt(max_area / pi)
-d <- d + 2
+d <- d + 4
 
 clust <- cutree(hc, h = d)
 
@@ -93,6 +100,10 @@ gps_info_df <- gps_info |>
   ungroup() |>
   mutate(state_cluster = paste0(STATE, "-", state_cluster))
 
+
+left_join(fb_take, gps_info)
+
+
 n_clusters <- length(unique(gps_info_df$state_cluster))
 
 n_per_cluster <- gps_info_df |>
@@ -102,6 +113,13 @@ n_per_cluster <- gps_info_df |>
 n_min2_per_cluster <- n_per_cluster |>
   filter(n >= 2) |>
   nrow()
+
+n_1_per_cluster <- n_per_cluster |>
+  filter(n == 1) |>
+  nrow()
+
+summary(n_per_cluster$n)
+hist(n_per_cluster$n, breaks = 25, main = "Cluster size", xlab = "Number of properties in a cluster")
 
 # check that clusters are within the correct distance
 colnames(dist_matrix) <- IDs
@@ -134,78 +152,34 @@ neighborhoods |>
 neighborhoods |>
   filter(STATE != STATE2)
 
-# 294 pairs of properties cross county lines
+# 69 clusters cross county lines
 neighborhoods |>
-  filter(FIPS != FIPS2)
-
-
-
-GeoLocations <- usmap_transform(
-  as.data.frame(gps_info_df),
-  input_names = c("Long", "Lat"))
-
-
-
-include <- c("OK")#, "OK", "LA", "MO", "AR", "MS", "AL", "GA", "NC", "SC")
-
-
-
-plot_data <- GeoLocations |>
-  filter(STATE %in% include) |>
-  filter(propertyID != "423698-420737")
-
-plot_usmap(regions = "county",
-           include = include
-           ) +
-  geom_sf(
-    data = plot_data,
-    aes(color = state_cluster)
-  ) +
-  theme(legend.position = "none")
+  filter(FIPS != FIPS2) |>
+  pull(state_cluster) |>
+  unique() |>
+  length()
 
 
 
 
 
-# TODO figure out how to use lat long with dist for hierarchical clustering
-dist_matrix2 <- dist(latlon[, c("Lat", "Long")])
-
-colnames(dist_matrix) <- IDs
-colnames(dist_upper) <- IDs
-
-# diag(dist_matrix) <- -1
-distances <- dist_matrix |>
-  as_tibble() |>
-  mutate(propertyID = IDs) |>
-  pivot_longer(cols = -propertyID,
-               names_to = "neighbor",
-               values_to = "distance_m") |>
-  # filter(distance_m != -1) |>
-  mutate(distance_km = distance_m / 1000)
-
-distance_upper <- dist_upper |>
-  as_tibble() |>
-  mutate(propertyID = IDs) |>
-  pivot_longer(cols = -propertyID,
-               names_to = "neighbor",
-               values_to = "keep")
-
-
-distances_keep <- left_join(distance_upper, distances) |>
-  filter(keep)
-
-
-
-clusters <- distances_keep |>
-  filter(distance_km <= d)
-
-n_neighbors <- clusters |>
-  group_by(propertyID) |>
-  count()
-
-summary(n_neighbors$n)
-
-distances |>
-  filter(distance <= d)
-
-
+# GeoLocations <- usmap_transform(
+#   as.data.frame(gps_info_df),
+#   input_names = c("Long", "Lat"))
+#
+# include <- c("OK")#, "OK", "LA", "MO", "AR", "MS", "AL", "GA", "NC", "SC")
+#
+#
+#
+# plot_data <- GeoLocations |>
+#   filter(STATE %in% include) |>
+#   filter(propertyID != "423698-420737")
+#
+# plot_usmap(regions = "county",
+#            include = include
+#            ) +
+#   geom_sf(
+#     data = plot_data,
+#     aes(color = state_cluster)
+#   ) +
+#   theme(legend.position = "none")
