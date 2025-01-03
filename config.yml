@@ -1,0 +1,28 @@
+default:
+  model_dir: "poisson-poisson"
+  # start_density: 0.3
+  # start_density: 1.475
+  # start_density: 2.65
+  start_density: 3.825
+  # start_density: 5
+  phi_mu: 0.58
+  psi_phi: 0.7
+  max_counties: 15
+  n_chains: 3
+
+dev:
+  data_dir: "data"
+  project_dir: "simulation"
+  out_dir: "out"
+  dev_dir: "dev"
+  analysis_dir: "analysis"
+  n_pp: 20
+  n_mcmc: 500
+  n_iter: 1000
+
+hpc_production:
+  inherits: hpc_test
+  dev_dir: "production"
+  n_pp: 40
+  n_mcmc: 1000
+  n_iter: 400000
