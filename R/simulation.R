@@ -2,23 +2,46 @@
 library(dplyr)
 library(readr)
 
+cluster <- 4
+cluster_props <- spatial_clusters |>
+  filter(cluster == 4)
+
+property_data <- properties[cluster_props$property]
+
+property_num <- x
+county_num <- spatial_clusters$county[x]
+X <- land_cover[spatial_clusters$county[x], ]
+start_density <- start_density
+
 params <- read_csv("../pigs-property/data/posterior_95CI_range_all.csv")
 
 draw_value <- function(x){
-  params |> filter(node == x) |> pull(med)
+  params |>
+    filter(grepl(x, node)) |>
+    pull(med) |>
+    round(2)
 }
 
 phi_mu <- draw_value("phi_mu")
 psi_phi <- draw_value("psi_phi")
 nu <- draw_value("nu")
+beta_p <- matrix(draw_value("beta_p"), 5, 3, byrow = TRUE)
+beta1 <- matrix(draw_value("beta1"), 5, 1)
+beta <- cbind(beta1, beta_p)
+omega <- draw_value("omega")
+gamma <- draw_value("gamma")
+rho <- draw_value("rho")
 
 a_phi <- phi_mu * psi_phi
 b_phi <- (1 - phi_mu) * psi_phi
 zeta <- 28 * nu / 365
 
-n_clusters <- 10
-n_prop_in_cluster <- round(runif(n_clusters, 0.5, 13))
-n_time <- 40
+survey_area <- property_data$area
+log_survey_area <- log(survey_area)
+log_rho <- log(rho)
+log_gamma <- log(gamma)
+p_unique <- omega
+
 
 # storage
 M <- matrix(NA, n_clusters, n_time)
@@ -26,9 +49,12 @@ y <- array(NA, dim = c(n_clusters, max(n_prop_in_cluster), n_time))
 
 # initial population (cluster) size
 area <- 250 # km2
-initial_density <- 5
 
-M[, 1] <- rpois(n_clusters, area * initial_density)
+M[, 1] <- rpois(n_clusters, area * starting_density)
+
+# spin up
+
+# =========== start with spin up
 
 # initial catch
 for(i in 1:n_clusters){
