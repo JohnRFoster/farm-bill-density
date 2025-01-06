@@ -14,6 +14,8 @@
 
 one_method_properties <- function(df, n_properties, n_pp){
   require(dplyr)
+  require(tidyr)
+  require(purrr)
 
   # function to get property IDs given number of methods used ----
   get_properties <- function(n_method){
