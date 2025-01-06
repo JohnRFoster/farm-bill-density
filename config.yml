@@ -7,7 +7,8 @@ default:
   # start_density: 5
   phi_mu: 0.58
   psi_phi: 0.7
-  max_counties: 15
+  max_clusters: 20
+  max_counties: 10
   n_chains: 3
 
 dev:
