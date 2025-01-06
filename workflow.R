@@ -126,5 +126,32 @@ properties <- c(
 n_properties <- length(properties)
 assertthat::are_equal(n_properties, sum(n_rel$n_simulate))
 
+assign_category <- function(n, n_props){
+
+  ## assign properties to clusters
+  weights <- runif(n)
+  norm_weights <- weights / sum(weights)
+  properties_per_cluster <- rmulti(1, n_props, norm_weights)
+  properties_per_cluster <- properties_per_cluster[properties_per_cluster > 0]
+  n_cluster <- length(properties_per_cluster)
+
+  ## randomly assign which county each property goes in
+  ## most properties in each cluster will be in the same county
+  ## sometimes there will be two counties in each cluster
+  order_cluster <- tibble(
+    property = sample.int(n_props),
+    cluster = rep(1:n_cluster, times = properties_per_cluster),
+    county = round(cluster + runif(n_props, 0, 0.6))
+  )
+}
+
+spatial_clusters <- assign_category(config$max_clusters, n_properties)
+
+## we need covariate data
+land_cover <- matrix(rnorm(n_county * 3), n_county, 3)
+
+start_density <- config$start_density
+
+
 
 
