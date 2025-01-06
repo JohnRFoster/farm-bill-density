@@ -110,6 +110,10 @@ n_per_cluster <- gps_info_df |>
   group_by(state_cluster) |>
   count()
 
+n_per_county <- gps_info_df |>
+  group_by(FIPS) |>
+  count()
+
 n_min2_per_cluster <- n_per_cluster |>
   filter(n >= 2) |>
   nrow()
