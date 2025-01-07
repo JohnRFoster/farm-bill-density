@@ -57,44 +57,51 @@ fb_take <- left_join(fb_join, all_take) |>
   filter(!is.na(take),
          st_name %in% states_model)
 
-write_csv(fb_take, "data/farmBillTakeGoodStates.csv")
-
-
 # only GA and FL are mismatched - suggests error in lat long reporting
 fb_take |>
   filter(Postal != STATE) |>
   group_by(Postal, STATE) |>
   count()
 
-# ignoring project for now
-gps_info <- fb_take |>
+max_area <- 250
+
+all_lat_lon <- fb_take |>
   filter(!is.na(Long),
-         !is.na(Lat)) |>
-  select(propertyID, STATE, FIPS, Long, Lat) |>
+         !is.na(Lat))
+
+write_csv(all_lat_lon, "data/farmBillTakeGoodStates.csv")
+
+# ignoring project for now
+gps_info <- all_lat_lon |>
+  select(propertyID, STATE, FIPS, property_area_km2, Long, Lat) |>
   distinct()
+
+# =======================
+# TODO
+# decide on what to do about properties with area larger than cluster size
+# =======================
+
+large_properties <- gps_info |> filter(property_area_km2 >= max_area)
+small_properties <- gps_info |> filter(property_area_km2 < max_area)
 
 IDs <- gps_info$propertyID
 
-latlon <- gps_info |>
+latlon <- small_properties |>
   select(Long, Lat) |>
   as.matrix()
 
-length(unique(fb_take$propertyID))
-
 dist_matrix <- distm(latlon) / 1000
 tmp <- as.dist(dist_matrix)
-
 hc <- hclust(tmp)
 
-max_area <- 150
 d <- 2 * sqrt(max_area / pi)
-d <- d + 4
 
 clust <- cutree(hc, h = d)
 
-gps_info$cluster <- clust
+small_properties$cluster <- clust
+large_properties$cluster <- seq(max(clust) + 1, by = 1, length.out = nrow(large_properties))
 
-gps_info_df <- gps_info |>
+gps_info_df <- bind_rows(small_properties, large_properties) |>
   group_by(STATE) |>
   mutate(state_cluster = cluster - min(cluster) + 1) |>
   ungroup() |>
@@ -103,6 +110,20 @@ gps_info_df <- gps_info |>
 
 left_join(fb_take, gps_info)
 
+cluster_areas <- gps_info_df |>
+  group_by(cluster, state_cluster) |>
+  summarise(cluster_area_km2 = sum(property_area_km2),
+            n_props = n()) |>
+  ungroup()
+
+cluster_areas |>
+  filter(n_props > 1) |>
+  pull(cluster_area_km2) |>
+  summary()
+
+cluster_areas |>
+  filter(cluster_area_km2 > 250,
+         n_props > 1)
 
 n_clusters <- length(unique(gps_info_df$state_cluster))
 
