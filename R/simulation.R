@@ -2,16 +2,18 @@
 library(dplyr)
 library(readr)
 
-cluster <- 4
-cluster_props <- spatial_clusters |>
-  filter(cluster == 4)
+source("R/functions_removal.R")
 
-property_data <- properties[cluster_props$property]
+effort_data <- read_csv("../multi-method-removal-model/data/effort_data.csv") |>
+  mutate(method_name = if_else(method_name == "TRAPS, CAGE", "TRAPS", method_name))
 
-property_num <- x
-county_num <- spatial_clusters$county[x]
-X <- land_cover[spatial_clusters$county[x], ]
+method_lookup <- effort_data |>
+  select(method, method_name) |>
+  mutate(idx = method) |>
+  distinct()
+
 start_density <- start_density
+hierarchy <- "Poisson"
 
 params <- read_csv("../pigs-property/data/posterior_95CI_range_all.csv")
 
@@ -36,21 +38,136 @@ a_phi <- phi_mu * psi_phi
 b_phi <- (1 - phi_mu) * psi_phi
 zeta <- 28 * nu / 365
 
-survey_area <- property_data$area
+
+x <- 1
+cluster_props <- spatial_clusters |>
+  filter(cluster == x)
+
+property_nums <- cluster_props$property
+
+n_props <- nrow(cluster_props)
+property_data <- properties[cluster_props$property]
+survey_area <- list_c(sapply(property_data, function(x) x["area"]))
+
 log_survey_area <- log(survey_area)
 log_rho <- log(rho)
 log_gamma <- log(gamma)
 p_unique <- omega
 
+sigma <- runif(1, 0, 5)
 
 # storage
+# initial population (cluster) size
+
+# =======================
+# TODO
+# decide on what to do about properties with area larger than cluster size
+# =======================
+area <- sum(survey_area) # km2
+Mspin <- rpois(1, area * start_density)
+
+# ecological process
+process_model <- function(N, zeta, a_phi, b_phi){
+  n <- length(N)
+  phi <- rbeta(n, a_phi, b_phi)
+  lambda <- (N / 2) * zeta + (N * phi)
+  rpois(n, lambda)
+}
+
+for(i in 1:6){
+  Mspin <- process_model(Mspin, zeta, a_phi, b_phi)
+}
+
+# distribute based on density
+d <- Mspin / area * survey_area
+
+N <- matrix(NA, n_props, n_pp)
+
+if(hierarchy == "Poisson"){
+  N[,1] <- rpois(n_props, d)
+} else if(hierarchy == "Gaussian"){
+  alpha <- log(d)
+  lambda <- rnorm(n_props, alpha, sigma)
+  N[,1] <- round(exp(lambda))
+}
+
+M <- rep(NA, n_pp)
+M[1] <- Mspin
+
+take <- tibble()
+for(t in 2:n_pp){
+
+  # reset catch
+  Y <- numeric(n_props)
+
+  for(i in seq_len(n_props)){
+    tmp_data <- property_data[[i]]
+
+    removal_effort <- tmp_data$effort
+    sample_occasions <- removal_effort$sample_occasions
+
+    remove_pigs <- t %in% sample_occasions
+
+    if(remove_pigs){
+      sample_effort <- removal_effort |> filter(sample_occasions == t)
+
+      # determine order of removal events
+      removal_order <- determine_removal_order(sample_effort)
+
+      # conduct removals
+      X <- land_cover[cluster_props$county[i], ]
+
+      nn <- N[i, t-1]
+      take_t <- conduct_removals(nn, removal_order, effort_data, log_survey_area[i],
+                                 X, beta, t,
+                                 log_rho, log_gamma, p_unique, method_lookup) |>
+        mutate(property = property_nums[i],
+               cluster = cluster,
+               county = cluster_props$county[i],
+               N = nn,
+               M = M[t-1])
+
+      take <- bind_rows(take, take_t)
+      Y[i] <- sum(take_t$take)
+
+      # how many pigs are left?
+      zi <- N[i, t-1] - Y[i]
+      assertthat::assert_that(zi >= 0,
+                              msg = paste("More pigs removed than are alive! Time =", t,
+                                          "Property =", i))
+
+    }
+
+  }
+
+  Z <- M[t-1] - sum(Y)
+
+  assertthat::assert_that(Z >= 0,
+                          msg = paste("More pigs removed from cluster than are alive! Time =", t))
+
+  M[t] <- process_model(Z, zeta, a_phi, b_phi)
+
+  # distribute based on density
+  d <- M[t] / area * survey_area
+
+  if(hierarchy == "Poisson"){
+    N[,t] <- rpois(n_props, d)
+  } else if(hierarchy == "Gaussian"){
+    alpha <- log(d)
+    lambda <- rnorm(n_props, alpha, sigma)
+    N[,t] <- round(exp(lambda))
+  }
+
+
+}
+
+
+
 M <- matrix(NA, n_clusters, n_time)
 y <- array(NA, dim = c(n_clusters, max(n_prop_in_cluster), n_time))
 
-# initial population (cluster) size
-area <- 250 # km2
 
-M[, 1] <- rpois(n_clusters, area * starting_density)
+
 
 # spin up
 
@@ -67,13 +184,7 @@ for(i in 1:n_clusters){
   }
 }
 
-# ecological process
-process_model <- function(N, zeta, a_phi, b_phi){
-  n <- length(N)
-  phi <- rbeta(n, a_phi, b_phi)
-  lambda <- (N / 2) * zeta + (N * phi)
-  rpois(n, lambda)
-}
+
 
 for(t in 2:n_time){
   C <- apply(y[,,t-1], 1, sum, na.rm = TRUE)
