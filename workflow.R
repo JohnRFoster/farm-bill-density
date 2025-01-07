@@ -65,7 +65,7 @@ after_start <- before_end <- rep(NA, nrow(df))
 message("Assign timesteps...")
 pb <- txtProgressBar(max = nrow(df), style = 1)
 for (i in 1:nrow(df)) {
-  after_start[i] <- which(timestep_df$start_dates <= df$end.date[i]) |> max()
+  after_start[i] <- which(timestep_df$start_dates <= df$start.date[i]) |> max()
   before_end[i] <- which(timestep_df$end_dates >= df$end.date[i]) |> min()
   if (after_start[i] == before_end[i]) {
     # then the start and end date is contained within a primary period
@@ -93,7 +93,7 @@ n_method_lookup <- df_with_timesteps |>
 n_rel <- n_method_lookup |>
   count(n, name = "n_sum") |>
   mutate(rel_prop = n_sum / sum(n_sum),
-         n_simulate = ceiling(rel_prop * 110))
+         n_simulate = ceiling(rel_prop * 200))
 
 # -----------------------------------------------------------------
 # 1-method properties ----
@@ -148,10 +148,11 @@ assign_category <- function(n, n_props){
 spatial_clusters <- assign_category(config$max_clusters, n_properties)
 
 ## we need covariate data
+n_county <- length(unique(spatial_clusters$county))
 land_cover <- matrix(rnorm(n_county * 3), n_county, 3)
 
 start_density <- config$start_density
-
+n_pp <- config$n_pp
 
 
 
