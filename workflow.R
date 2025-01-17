@@ -126,6 +126,8 @@ properties <- c(
 n_properties <- length(properties)
 assertthat::are_equal(n_properties, sum(n_rel$n_simulate))
 
+
+
 assign_category <- function(n, n_props){
 
   ## assign properties to clusters
@@ -149,7 +151,7 @@ spatial_clusters <- assign_category(config$max_clusters, n_properties)
 
 ## we need covariate data
 n_county <- length(unique(spatial_clusters$county))
-land_cover <- matrix(rnorm(n_county * 3), n_county, 3)
+land_cover <- matrix(rnorm(n_properties * 3), n_properties, 3)
 
 start_density <- config$start_density
 n_pp <- config$n_pp
