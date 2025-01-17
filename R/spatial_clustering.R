@@ -73,138 +73,154 @@ write_csv(all_lat_lon, "data/farmBillTakeGoodStates.csv")
 
 # ignoring project for now
 gps_info <- all_lat_lon |>
-  select(propertyID, STATE, FIPS, property_area_km2, Long, Lat) |>
+  select(propertyID, Project, STATE, FIPS, property_area_km2, Long, Lat) |>
   distinct()
 
 # =======================
 # TODO
-# decide on what to do about properties with area larger than cluster size
+# check there isn't too much overlap in property ID and cluster ID
+#    if there is a lot of overlap wont be identifable
+# get landcover information for property latlon
 # =======================
 
-large_properties <- gps_info |> filter(property_area_km2 >= max_area)
-small_properties <- gps_info |> filter(property_area_km2 < max_area)
+area_threshold <- max_area * 1
 
-IDs <- gps_info$propertyID
+create_clusters <- function(df, a, cmin){
 
-latlon <- small_properties |>
-  select(Long, Lat) |>
-  as.matrix()
+  latlon <- df |>
+    select(Long, Lat) |>
+    as.matrix()
 
-dist_matrix <- distm(latlon) / 1000
-tmp <- as.dist(dist_matrix)
-hc <- hclust(tmp)
+  dist_matrix <- distm(latlon) / 1000
+  tmp <- as.dist(dist_matrix)
+  hc <- hclust(tmp, method = "complete")
 
-d <- 2 * sqrt(max_area / pi)
+  d <- 2 * sqrt(a / pi)
 
-clust <- cutree(hc, h = d)
+  clust <- cutree(hc, h = d)
 
-small_properties$cluster <- clust
-large_properties$cluster <- seq(max(clust) + 1, by = 1, length.out = nrow(large_properties))
+  df$cluster <- clust + cmin
 
-gps_info_df <- bind_rows(small_properties, large_properties) |>
+  df
+
+}
+
+get_max_size <- function(df){
+  df |>
+    group_by(cluster) |>
+    summarise(area = sum(property_area_km2)) |>
+    ungroup() |>
+    filter(area == max(area)) |>
+    pull(area)
+}
+
+get_bad_properties <- function(dfc){
+
+  cc <- dfc |>
+    group_by(cluster) |>
+    summarise(area = sum(property_area_km2)) |>
+    ungroup() |>
+    filter(area > max_area) |>
+    pull(cluster)
+
+  dfc |>
+    filter(cluster %in% cc) |>
+    pull(propertyID)
+
+}
+
+large_properties <- gps_info |> filter(property_area_km2 >= area_threshold)
+small_properties <- gps_info |> filter(property_area_km2 < area_threshold)
+
+clusters1 <- create_clusters(small_properties, area_threshold, 0)
+
+bad_props <- get_bad_properties(clusters1)
+
+all_clusters <- clusters1 |> filter(!propertyID %in% bad_props)
+
+dfc <- clusters1
+
+max_size <- get_max_size(clusters1)
+scaler <- seq(0.9, 0, length.out = 20)
+for(s in scaler){
+
+  tmp <- small_properties |> filter(propertyID %in% bad_props)
+
+  mc <- dfc |> pull(cluster) |> max()
+
+  dfc <- create_clusters(tmp, max_area * s, mc)
+
+  bad_props <- get_bad_properties(dfc)
+  dfg <- dfc |> filter(!propertyID %in% bad_props)
+
+  if(nrow(dfg) == 0){
+    next
+  } else {
+    all_clusters <- bind_rows(all_clusters, dfg)
+  }
+
+  if(nrow(all_clusters) == nrow(small_properties)) break
+
+  if(s == 0){
+    mc <- dfc |> pull(cluster) |> max()
+    tmp <- small_properties |>
+      filter(propertyID %in% bad_props) |>
+      mutate(cluster = seq(mc + 1, by = 1, length.out = n()))
+
+    all_clusters <- bind_rows(all_clusters, tmp)
+
+  }
+
+}
+
+mc <- all_clusters |> pull(cluster) |> max()
+large_properties$cluster <- seq(mc + 1, by = 1, length.out = nrow(large_properties))
+
+all_clusters <- bind_rows(all_clusters, large_properties) |>
   group_by(STATE) |>
   mutate(state_cluster = cluster - min(cluster) + 1) |>
   ungroup() |>
   mutate(state_cluster = paste0(STATE, "-", state_cluster))
 
+assertthat::are_equal(nrow(all_clusters), nrow(gps_info))
 
-left_join(fb_take, gps_info)
-
-cluster_areas <- gps_info_df |>
+cluster_areas <- all_clusters |>
   group_by(cluster, state_cluster) |>
   summarise(cluster_area_km2 = sum(property_area_km2),
             n_props = n()) |>
   ungroup()
 
-cluster_areas |>
-  filter(n_props > 1) |>
-  pull(cluster_area_km2) |>
-  summary()
+larger_than_max_area <- cluster_areas |>
+  filter(cluster_area_km2 > max_area)
 
-cluster_areas |>
-  filter(cluster_area_km2 > 250,
-         n_props > 1)
+assertthat::assert_that(all(larger_than_max_area$n_props == 1))
 
-n_clusters <- length(unique(gps_info_df$state_cluster))
+n_clusters <- length(unique(all_clusters$state_cluster))
 
-n_per_cluster <- gps_info_df |>
+n_per_cluster <- all_clusters |>
   group_by(state_cluster) |>
   count()
 
-n_per_county <- gps_info_df |>
+summary(n_per_cluster$n)
+
+n_per_county <- all_clusters |>
   group_by(FIPS) |>
   count()
 
-n_min2_per_cluster <- n_per_cluster |>
-  filter(n >= 2) |>
-  nrow()
-
-n_1_per_cluster <- n_per_cluster |>
-  filter(n == 1) |>
-  nrow()
-
-summary(n_per_cluster$n)
 hist(n_per_cluster$n, breaks = 25, main = "Cluster size", xlab = "Number of properties in a cluster")
 
-# check that clusters are within the correct distance
-colnames(dist_matrix) <- IDs
-dist_matrix[!upper.tri(dist_matrix)] <- -1
+all_clusters |>
+  select(cluster, STATE) |>
+  distinct() |>
+  group_by(cluster) |>
+  count(STATE) |>
+  filter(n > 1)
 
-gps_info_df2 <- gps_info_df |>
-  rename(propertyID2 = propertyID,
-         STATE2 = STATE,
-         FIPS2 = FIPS,
-         state_cluster2 = state_cluster) |>
-  select(-Long, -Lat, -cluster)
-
-neighborhoods <- dist_matrix |>
-  as_tibble() |>
-  mutate(propertyID = IDs) |>
-  pivot_longer(cols = -propertyID,
-               names_to = "propertyID2",
-               values_to = "distance") |>
-  filter(distance != -1) |>
-  left_join(gps_info_df) |>
-  left_join(gps_info_df2) |>
-  filter(state_cluster == state_cluster2) |>
-  select(-state_cluster2)
-
-neighborhoods |>
-  group_by(state_cluster) |>
-  filter(distance == max(distance))
-
-# no clusters cross state lines
-neighborhoods |>
-  filter(STATE != STATE2)
-
-# 69 clusters cross county lines
-neighborhoods |>
-  filter(FIPS != FIPS2) |>
-  pull(state_cluster) |>
-  unique() |>
-  length()
+all_clusters |>
+  select(cluster, FIPS) |>
+  distinct() |>
+  group_by(cluster) |>
+  count(FIPS) |>
+  filter(n > 1)
 
 
-
-
-
-# GeoLocations <- usmap_transform(
-#   as.data.frame(gps_info_df),
-#   input_names = c("Long", "Lat"))
-#
-# include <- c("OK")#, "OK", "LA", "MO", "AR", "MS", "AL", "GA", "NC", "SC")
-#
-#
-#
-# plot_data <- GeoLocations |>
-#   filter(STATE %in% include) |>
-#   filter(propertyID != "423698-420737")
-#
-# plot_usmap(regions = "county",
-#            include = include
-#            ) +
-#   geom_sf(
-#     data = plot_data,
-#     aes(color = state_cluster)
-#   ) +
-#   theme(legend.position = "none")
