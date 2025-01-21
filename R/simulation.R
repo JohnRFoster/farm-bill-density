@@ -38,7 +38,6 @@ a_phi <- phi_mu * psi_phi
 b_phi <- (1 - phi_mu) * psi_phi
 zeta <- 28 * nu / 365
 
-
 x <- 1
 cluster_props <- spatial_clusters |>
   filter(cluster == x)
@@ -63,6 +62,7 @@ sigma <- runif(1, 0, 5)
 # TODO
 # decide on what to do about properties with area larger than cluster size
 # =======================
+
 area <- sum(survey_area) # km2
 Mspin <- rpois(1, area * start_density)
 

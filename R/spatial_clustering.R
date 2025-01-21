@@ -7,6 +7,8 @@ library(ggplot2)
 library(ggspatial)
 library(usmap)
 
+source("R/functions_misc.R")
+
 data_repo <- "../pigs-statistical/data"
 fb_info <- read_csv(file.path(data_repo, "FarmBill_GPS_1124_start_end_clean.csv"))
 
@@ -83,104 +85,10 @@ gps_info <- all_lat_lon |>
 # get landcover information for property latlon
 # =======================
 
-area_threshold <- max_area * 1
+all_clusters <- make_clusters(max_area, gps_info)
 
-create_clusters <- function(df, a, cmin){
 
-  latlon <- df |>
-    select(Long, Lat) |>
-    as.matrix()
 
-  dist_matrix <- distm(latlon) / 1000
-  tmp <- as.dist(dist_matrix)
-  hc <- hclust(tmp, method = "complete")
-
-  d <- 2 * sqrt(a / pi)
-
-  clust <- cutree(hc, h = d)
-
-  df$cluster <- clust + cmin
-
-  df
-
-}
-
-get_max_size <- function(df){
-  df |>
-    group_by(cluster) |>
-    summarise(area = sum(property_area_km2)) |>
-    ungroup() |>
-    filter(area == max(area)) |>
-    pull(area)
-}
-
-get_bad_properties <- function(dfc){
-
-  cc <- dfc |>
-    group_by(cluster) |>
-    summarise(area = sum(property_area_km2)) |>
-    ungroup() |>
-    filter(area > max_area) |>
-    pull(cluster)
-
-  dfc |>
-    filter(cluster %in% cc) |>
-    pull(propertyID)
-
-}
-
-large_properties <- gps_info |> filter(property_area_km2 >= area_threshold)
-small_properties <- gps_info |> filter(property_area_km2 < area_threshold)
-
-clusters1 <- create_clusters(small_properties, area_threshold, 0)
-
-bad_props <- get_bad_properties(clusters1)
-
-all_clusters <- clusters1 |> filter(!propertyID %in% bad_props)
-
-dfc <- clusters1
-
-max_size <- get_max_size(clusters1)
-scaler <- seq(0.9, 0, length.out = 20)
-for(s in scaler){
-
-  tmp <- small_properties |> filter(propertyID %in% bad_props)
-
-  mc <- dfc |> pull(cluster) |> max()
-
-  dfc <- create_clusters(tmp, max_area * s, mc)
-
-  bad_props <- get_bad_properties(dfc)
-  dfg <- dfc |> filter(!propertyID %in% bad_props)
-
-  if(nrow(dfg) == 0){
-    next
-  } else {
-    all_clusters <- bind_rows(all_clusters, dfg)
-  }
-
-  if(nrow(all_clusters) == nrow(small_properties)) break
-
-  if(s == 0){
-    mc <- dfc |> pull(cluster) |> max()
-    tmp <- small_properties |>
-      filter(propertyID %in% bad_props) |>
-      mutate(cluster = seq(mc + 1, by = 1, length.out = n()))
-
-    all_clusters <- bind_rows(all_clusters, tmp)
-
-  }
-
-}
-
-mc <- all_clusters |> pull(cluster) |> max()
-large_properties$cluster <- seq(mc + 1, by = 1, length.out = nrow(large_properties))
-
-all_clusters <- bind_rows(all_clusters, large_properties) |>
-  group_by(STATE) |>
-  mutate(state_cluster = cluster - min(cluster) + 1) |>
-  ungroup() |>
-  mutate(state_cluster = paste0(STATE, "-", state_cluster))
 
 assertthat::are_equal(nrow(all_clusters), nrow(gps_info))
 
