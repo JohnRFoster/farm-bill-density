@@ -96,7 +96,7 @@ n_method_properties <- function(df, n_properties, n, n_pp){
   subset_area_n_method <- function(prop_vec){
     df |>
       filter(property %in% prop_vec) |>
-      select(property, method, property.size) |>
+      select(property, method, property_area_km2) |>
       distinct() |>
       group_by(property) |>
       mutate(n = paste0("n_", 1:n())) |>
@@ -114,9 +114,9 @@ n_method_properties <- function(df, n_properties, n, n_pp){
       group_by(property) |>
       filter(all(method %in% m)) |>
       ungroup() |>
-      select(property, property.size) |>
+      select(property, property_area_km2) |>
       distinct() |>
-      pull(property.size) |>
+      pull(property_area_km2) |>
       sample(1)
 
   }

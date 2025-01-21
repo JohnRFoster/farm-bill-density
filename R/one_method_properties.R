@@ -69,13 +69,13 @@ one_method_properties <- function(df, n_properties, n_pp){
   get_area <- function(dat, m){
     dat |>
       filter(method == m) |>
-      pull(property.size) |>
+      pull(property_area_km2) |>
       sample(1)
   }
 
   one_method_areas <- df |>
     filter(property %in% one_method_props) |>
-    select(property, method, property.size) |>
+    select(property, method, property_area_km2) |>
     distinct()
 
   ## assign areas to 1-method properties ----
