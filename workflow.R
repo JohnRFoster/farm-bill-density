@@ -126,28 +126,25 @@ properties <- c(
 n_properties <- length(properties)
 assertthat::are_equal(n_properties, sum(n_rel$n_simulate))
 
+# randomly assign each property a Lat Lon
+gps_info <- df_with_timesteps |>
+  select(Lat, Long) |>
+  slice(sample.int(nrow(df_with_timesteps), n_properties)) |>
+  mutate(property = 1:n(),
+         property_area_km2 = list_c(map(properties, "area")),
+         STATE = "CO",
+         propertyID = 1:n())
 
+all_clusters <- make_clusters(250, gps_info)
 
-assign_category <- function(n, n_props){
+n_clusters <- length(unique(all_clusters$state_cluster))
 
-  ## assign properties to clusters
-  weights <- runif(n)
-  norm_weights <- weights / sum(weights)
-  properties_per_cluster <- rmulti(1, n_props, norm_weights)
-  properties_per_cluster <- properties_per_cluster[properties_per_cluster > 0]
-  n_cluster <- length(properties_per_cluster)
+n_per_cluster <- all_clusters |>
+  group_by(state_cluster) |>
+  count()
 
-  ## randomly assign which county each property goes in
-  ## most properties in each cluster will be in the same county
-  ## sometimes there will be two counties in each cluster
-  order_cluster <- tibble(
-    property = sample.int(n_props),
-    cluster = rep(1:n_cluster, times = properties_per_cluster),
-    county = round(cluster + runif(n_props, 0, 0.6))
-  )
-}
-
-spatial_clusters <- assign_category(config$max_clusters, n_properties)
+summary(n_per_cluster$n)
+hist(n_per_cluster$n)
 
 ## we need covariate data
 n_county <- length(unique(spatial_clusters$county))
