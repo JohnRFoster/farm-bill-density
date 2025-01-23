@@ -110,7 +110,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
     property_data <- properties[propertyIDs]
 
     take <- tibble()
-    for(t in 2:n_pp){
+    for(t in 1:(n_pp-1)){
 
       # reset catch
       Y <- numeric(n_props)
@@ -132,7 +132,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
           # conduct removals
           X <- land_cover[propertyIDs[j], ]
 
-          nn <- N[j, t-1]
+          nn <- N[j, t]
           take_t <- conduct_removals(nn, removal_order, effort_data, log_survey_area[j],
                                      X, beta, t,
                                      log_rho, log_gamma, p_unique, method_lookup) |>
@@ -140,7 +140,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
                    property_area_km2 = survey_area[j],
                    cluster = i,
                    N = nn,
-                   M = M[t-1])
+                   M = M[t])
 
           take <- bind_rows(take, take_t)
           Y[j] <- sum(take_t$take)
@@ -159,26 +159,29 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
       }
 
       # need to use the realized cluster size in case all pigs are removed
-      Z <- sum(N[, t-1]) - sum(Y)
+      Z <- sum(N[, t]) - sum(Y)
 
       identifier <- paste0("\nCluster ", i, "\nTime ", t)
       assertthat::assert_that(Z >= 0,
                               msg = paste("More pigs removed from cluster than are alive!", identifier))
 
-      M[t] <- process_model(Z, zeta, a_phi, b_phi)
+      if(t < n_pp){
+        M[t+1] <- process_model(Z, zeta, a_phi, b_phi)
 
-      # distribute based on density
-      d <- M[t] / area * survey_area
+        # distribute based on density
+        d <- M[t+1] / area * survey_area
 
-      if(single_property_cluster){
-        N[,t] <- d
-      } else {
-        N[,t] <- rpois(n_props, d)
+        if(single_property_cluster){
+          N[,t+1] <- d
+        } else {
+          N[,t+1] <- rpois(n_props, d)
+        }
+
+        # alpha <- log(d)
+        # lambda <- rnorm(n_props, alpha, sigma)
+        # N[,t] <- round(exp(lambda))
       }
 
-      # alpha <- log(d)
-      # lambda <- rnorm(n_props, alpha, sigma)
-      # N[,t] <- round(exp(lambda))
 
     }
 
