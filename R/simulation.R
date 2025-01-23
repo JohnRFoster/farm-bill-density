@@ -229,11 +229,13 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
 
   M <- left_join(all_pigs, extinct_clusters) |>
     filter(is.na(drop_flag)) |>
-    select(-drop_flag)
+    select(-drop_flag) |>
+    arrange(cluster, propertyID, PPNum)
 
   take_data <- left_join(all_take, extinct_clusters) |>
     filter(is.na(drop_flag)) |>
-    select(-drop_flag)
+    select(-drop_flag) |>
+    arrange(cluster, propertyID, PPNum, order)
 
   return(list(
     all_pigs = M,
