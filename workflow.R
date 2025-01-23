@@ -35,6 +35,9 @@ library(tidyr)
 library(purrr)
 library(lubridate)
 
+source("R/functions_misc.R")
+source("R/simulation.R")
+
 # -----------------------------------------------------------------
 # Load MIS data ----
 # -----------------------------------------------------------------
@@ -80,7 +83,11 @@ write_csv(timestep_df, file.path("data/timestep_df.csv"))
 df_with_timesteps <- df |>
   filter(!is.na(timestep)) |>
   left_join(timestep_df) |>
+  filter(year >= StartYr,
+         year <= LastYr) |>
   arrange(propertyID, timestep)
+
+
 
 # need a lookup table for property IDs and how may methods they employ ----
 n_method_lookup <- df_with_timesteps |>
@@ -135,6 +142,7 @@ gps_info <- df_with_timesteps |>
          STATE = "CO",
          propertyID = 1:n())
 
+
 all_clusters <- make_clusters(250, gps_info)
 
 n_clusters <- length(unique(all_clusters$state_cluster))
@@ -147,11 +155,39 @@ summary(n_per_cluster$n)
 hist(n_per_cluster$n)
 
 ## we need covariate data
-n_county <- length(unique(spatial_clusters$county))
 land_cover <- matrix(rnorm(n_properties * 3), n_properties, 3)
 
 start_density <- config$start_density
-n_pp <- config$n_pp
+cluster_props <- all_clusters
+
+simulated_data <- simulate_cluster_dynamics(
+  start_density = start_density,
+  cluster_props = all_clusters,
+  properties = properties,
+  land_cover = land_cover
+)
+
+data <- simulated_data$all_take
+abundance <- M <-  simulated_data$all_pigs
+
+extinct_clusters
+
+left_join(data, extinct_clusters) |>
+  filter(is.na(drop_flag))
+
+# exploratory
+data |>
+  group_by(M, N, PPNum, cluster, propertyID) |>
+  summarise(total_take = sum(take)) |>
+  group_by(propertyID) |>
+  filter(all(total_take == 0)) |>
+  arrange(propertyID, PPNum) |>
+  ungroup() |>
+  filter(N > 0)
+
+
+
+
 
 
 
