@@ -87,7 +87,7 @@ gps_info <- all_lat_lon |>
 
 all_clusters <- make_clusters(max_area, gps_info)
 
-
+write_csv(all_clusters, "data/clusters250km2.csv")
 
 
 assertthat::are_equal(nrow(all_clusters), nrow(gps_info))
