@@ -36,6 +36,7 @@ library(purrr)
 library(lubridate)
 
 source("R/functions_misc.R")
+source("R/functions_prep_nimble_simulation.R")
 source("R/simulation.R")
 
 # -----------------------------------------------------------------
@@ -130,9 +131,6 @@ properties <- c(
   method_4
 )
 
-n_properties <- length(properties)
-assertthat::are_equal(n_properties, sum(n_rel$n_simulate))
-
 # randomly assign each property a Lat Lon
 gps_info <- df_with_timesteps |>
   select(Lat, Long) |>
@@ -154,40 +152,26 @@ n_per_cluster <- all_clusters |>
 summary(n_per_cluster$n)
 hist(n_per_cluster$n)
 
-## we need covariate data
-land_cover <- matrix(rnorm(n_properties * 3), n_properties, 3)
-
 start_density <- config$start_density
 cluster_props <- all_clusters
 
 simulated_data <- simulate_cluster_dynamics(
   start_density = start_density,
   cluster_props = all_clusters,
-  properties = properties,
-  land_cover = land_cover
+  properties = properties
 )
 
-data <- simulated_data$all_take
-abundance <- M <-  simulated_data$all_pigs
+take <- simulated_data$all_take
+abundance <-  simulated_data$all_pigs
 
-extinct_clusters
+n_properties <- max(take$property)
 
-left_join(data, extinct_clusters) |>
-  filter(is.na(drop_flag))
+nimble_ls <- prep_nimble(take)
+nimble_data <- nimble_ls$data
+nimble_constants <- nimble_ls$constants
 
-# exploratory
-data |>
-  group_by(M, N, PPNum, cluster, propertyID) |>
-  summarise(total_take = sum(take)) |>
-  group_by(propertyID) |>
-  filter(all(total_take == 0)) |>
-  arrange(propertyID, PPNum) |>
-  ungroup() |>
-  filter(N > 0)
-
-
-
-
-
-
+constants_nimble = nimble_constants
+data_nimble = nimble_data
+attach(constants_nimble)
+attach(data_nimble)
 
