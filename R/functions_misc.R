@@ -134,3 +134,37 @@ process_model <- function(N, zeta, a_phi, b_phi){
   lambda <- (N / 2) * zeta + (N * phi)
   rpois(n, lambda)
 }
+
+make_all_pp <- function(df, g){
+
+  min_max <- df |>
+    rename(x := g) |>
+    select(x, PPNum) |>
+    distinct() |>
+    group_by(x) |>
+    filter(PPNum == min(PPNum) | PPNum == max(PPNum))
+
+  x_vec <- min_max |> pull(x) |> unique()
+
+  all_pp <- tibble()
+  for(i in x_vec){
+    tmp <- min_max |> filter(x == i)
+    minpp <- min(tmp$PPNum)
+    maxpp <- max(tmp$PPNum)
+
+    tmpp <- tibble(
+      x = i,
+      PPNum = minpp:maxpp
+    )
+
+    all_pp <- bind_rows(all_pp, tmpp)
+
+  }
+
+  all_pp |>
+    group_by(x) |>
+    mutate(timestep = 1:n()) |>
+    ungroup() |>
+    rename(!!sym(g) := x)
+
+}
