@@ -78,24 +78,35 @@ modelCode <- nimbleCode({
   for(i in 1:n_cluster){
 
     log_lambda_1[i] ~ dunif(0, 10)
-    log(M[nH[i, 1]]) <- log_lambda_1[i]
+    log(M[mH[i, 1]]) <- log_lambda_1[i]
 
     # population growth across time steps
-    for(j in 2:n_time){ # loop through every PP, including missing ones
+    for(j in 2:n_time_clust[i]){ # loop through every PP, including missing ones
 
-      lambda[i, j-1] <- (M[i, j-1] - rem[i, j-1]) * zeta / 2 +
-        (M[i, j-1] - rem[i, j-1]) * phi[i, j-1]
+      lambda[mH[i, j-1]] <- (M[mH[i, j-1]] - rem[i, j-1]) * zeta / 2 +
+        (M[mH[i, j-1]] - rem[i, j-1]) * phi[mH[i, j-1]]
 
-      M[i, j] ~ dpois(lambda[i, j-1])
-      phi[i, j-1] ~ dbeta(a_phi, b_phi)
+      M[mH[i, j]] ~ dpois(lambda[mH[i, j-1]])
+      phi[mH[i, j-1]] ~ dbeta(a_phi, b_phi)
 
     }
 
   }
 
-  for(i in 1:n_property){
-    for(t in 1:n_time){
-      N[nH[i, t]] ~ dpois(M[mH[i, t]])
+  # single property clusters
+  # property abundance = cluster abundance
+  for(i in 1:n_single_property_clusters){
+    for(t in 1:n_time_single_property_clusters[i]){
+      N[nH[i, t]] <- M[nmH[i, t]]
+    }
+  }
+
+  # multiple property clusters
+  # distribute based on average density
+  for(i in 1:n_multi_property_clusters){
+    for(t in 1:n_time_multi_property_clusters[i]){
+      N[nH[i, t]] ~ dpois(d[nH[i, t]])
+      log(d[nH[i, t]]) <- log(M[nmH[i, t]]) - log_cluster_area[i] + log_property_area[i]
     }
   }
 
