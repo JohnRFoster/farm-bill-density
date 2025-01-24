@@ -1,5 +1,5 @@
 
-simulate_cluster_dynamics <- function(start_density, cluster_props, properties, land_cover){
+simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
 
   library(dplyr)
   library(tidyr)
@@ -46,6 +46,8 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
   b_phi <- (1 - phi_mu) * psi_phi
   zeta <- 28 * nu / 365
 
+  # there can be up to m0 primary periods after all pigs are gone before we drop data
+  m0 <- 6
 
   n_clusters <- max(cluster_props$cluster)
 
@@ -76,6 +78,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
     log_survey_area <- log(survey_area)
 
     n_props <- length(survey_area)
+    X <- matrix(rnorm(3 * n_props), n_props, 3)
 
     single_property_cluster <- if_else(n_props == 1, TRUE, FALSE)
 
@@ -92,11 +95,15 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
     d <- Mspin / area * survey_area
 
     N <- matrix(NA, n_props, n_pp)
+    M <- M_actual <- rep(NA, n_pp)
+    M[1] <- Mspin
 
     if(single_property_cluster){
       N[,1] <- d
+      M_actual[1] <- d
     } else {
       N[,1] <- rpois(n_props, d)
+      M_actual[1] <- sum(N[,1])
     }
 
     # if we choose to use a normal HB model
@@ -104,11 +111,9 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
     # lambda <- rnorm(n_props, alpha, sigma)
     # N[,1] <- round(exp(lambda))
 
-    M <- rep(NA, n_pp)
-    M[1] <- Mspin
-
     property_data <- properties[propertyIDs]
 
+    e_count <- 0
     take <- tibble()
     for(t in 1:(n_pp-1)){
 
@@ -130,17 +135,21 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
           removal_order <- determine_removal_order(sample_effort)
 
           # conduct removals
-          X <- land_cover[propertyIDs[j], ]
-
           nn <- N[j, t]
+
           take_t <- conduct_removals(nn, removal_order, effort_data, log_survey_area[j],
-                                     X, beta, t,
+                                     X[j,], beta, t,
                                      log_rho, log_gamma, p_unique, method_lookup) |>
             mutate(propertyID = propertyIDs[j],
                    property_area_km2 = survey_area[j],
+                   cluster_area_km2 = area,
                    cluster = i,
                    N = nn,
-                   M = M[t])
+                   M = M[t],
+                   M_actual = M_actual[t],
+                   c_road_den = X[j, 1],
+                   c_rugged = X[j, 2],
+                   c_canopy = X[j ,3])
 
           take <- bind_rows(take, take_t)
           Y[j] <- sum(take_t$take)
@@ -159,7 +168,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
       }
 
       # need to use the realized cluster size in case all pigs are removed
-      Z <- sum(N[, t]) - sum(Y)
+      Z <- M_actual[t] - sum(Y)
 
       identifier <- paste0("\nCluster ", i, "\nTime ", t)
       assertthat::assert_that(Z >= 0,
@@ -173,13 +182,19 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
 
         if(single_property_cluster){
           N[,t+1] <- d
+          M_actual[t+1] <- d
         } else {
           N[,t+1] <- rpois(n_props, d)
+          M_actual[t+1] <- sum(N[,t+1])
         }
 
         # alpha <- log(d)
         # lambda <- rnorm(n_props, alpha, sigma)
         # N[,t] <- round(exp(lambda))
+
+        e_count <- if_else(M_actual[t+1] == 0, e_count + 1, e_count)
+        if(e_count >= m0) break
+
       }
 
 
@@ -187,6 +202,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
 
     M_df <- tibble(
       M = M,
+      M_actual = M_actual,
       PPNum = 1:n_pp,
       cluster = i
     )
@@ -202,44 +218,41 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties, 
 
     pigs_i <- left_join(M_df, N_df) |> suppressMessages()
 
-    all_pigs <- bind_rows(all_pigs, pigs_i) |>
-      mutate(cluster = as.numeric(as.factor(cluster)))
-    all_take <- bind_rows(all_take, take) |>
-      mutate(cluster = as.numeric(as.factor(cluster)))
+    all_pigs <- bind_rows(all_pigs, pigs_i)
+    all_take <- bind_rows(all_take, take)
 
     setTxtProgressBar(pb, i)
 
   }
   close(pb)
 
-
-  # there can be up to m0 primary periods after all pigs are gone before we drop data
-  m0 <- 6
-
-  extinct_clusters <- all_pigs |>
-    select(M, cluster, PPNum) |>
+  good_clusters <- all_take |>
+    select(cluster, PPNum) |>
     distinct() |>
-    filter(M == 0) |>
     group_by(cluster) |>
-    mutate(n0 = 1:n()) |>
-    ungroup() |>
-    filter(n0 > m0) |>
-    mutate(drop_flag = 1) |>
-    select(-n0)
+    mutate(nt = 1:n()) |>
+    filter(max(nt) > 1) |>
+    pull(cluster) |>
+    unique()
 
-  M <- left_join(all_pigs, extinct_clusters) |>
-    filter(is.na(drop_flag)) |>
-    select(-drop_flag) |>
-    arrange(cluster, propertyID, PPNum)
+  all_take <- all_take |>
+    filter(cluster %in% good_clusters) |>
+    mutate(cluster = as.numeric(as.factor(cluster)),
+           property = as.numeric(as.factor(propertyID))) |>
+    arrange(property, PPNum, order)
 
-  take_data <- left_join(all_take, extinct_clusters) |>
-    filter(is.na(drop_flag)) |>
-    select(-drop_flag) |>
-    arrange(cluster, propertyID, PPNum, order)
+  all_pigs <- all_pigs |>
+    filter(!is.na(M),
+           cluster %in% good_clusters,
+           propertyID %in% unique(all_take$propertyID)) |>
+    mutate(cluster = as.numeric(as.factor(cluster)),
+           property = as.numeric(as.factor(propertyID))) |>
+    arrange(property, PPNum)
+
 
   return(list(
-    all_pigs = M,
-    all_take = take_data
+    all_pigs = all_pigs,
+    all_take = all_take
   ))
 }
 
