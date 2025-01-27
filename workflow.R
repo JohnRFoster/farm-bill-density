@@ -38,6 +38,9 @@ library(lubridate)
 source("R/functions_misc.R")
 source("R/functions_prep_nimble_simulation.R")
 source("R/simulation.R")
+source("R/fit_mcmc_simulation.R")
+source("R/nimble_cluster_model.R")
+source("R/check_mcmc.R")
 
 # -----------------------------------------------------------------
 # Load MIS data ----
@@ -134,7 +137,7 @@ properties <- c(
 # randomly assign each property a Lat Lon
 gps_info <- df_with_timesteps |>
   select(Lat, Long) |>
-  slice(sample.int(nrow(df_with_timesteps), n_properties)) |>
+  slice(sample.int(nrow(df_with_timesteps), length(properties))) |>
   mutate(property = 1:n(),
          property_area_km2 = list_c(map(properties, "area")),
          STATE = "CO",
@@ -150,7 +153,7 @@ n_per_cluster <- all_clusters |>
   count()
 
 summary(n_per_cluster$n)
-hist(n_per_cluster$n)
+hist(n_per_cluster$n, breaks = 20)
 
 start_density <- config$start_density
 cluster_props <- all_clusters
@@ -164,14 +167,80 @@ simulated_data <- simulate_cluster_dynamics(
 take <- simulated_data$all_take
 abundance <-  simulated_data$all_pigs
 
-n_properties <- max(take$property)
-
 nimble_ls <- prep_nimble(take)
 nimble_data <- nimble_ls$data
 nimble_constants <- nimble_ls$constants
 
-constants_nimble = nimble_constants
-data_nimble = nimble_data
-attach(constants_nimble)
-attach(data_nimble)
+monitors_add <- c("N", "M")
 
+params_check <- c(
+  "beta_p",
+  "beta1",
+  "log_gamma",
+  "log_rho",
+  "phi_mu",
+  "psi_phi",
+  "log_nu",
+  "p_mu"
+)
+
+n_chains <- 3
+cl <- makeCluster(n_chains)
+
+samples <- fit_mcmc(
+  cl = cl,
+  modelCode = modelCode,
+  data = nimble_ls$data,
+  constants = nimble_ls$constants,
+  start_density = start_density,
+  n_iter = 10000,
+  n_chains = n_chains,
+  custom_samplers = NULL,
+  monitors_add
+)
+
+stopCluster(cl)
+
+samples_mcmc <- as.mcmc.list(samples)
+
+check <- check_mcmc(
+  samples = samples_mcmc,
+  nodes_check = params_check
+)
+
+
+
+
+
+
+
+
+
+
+
+source("R/functions_misc.R")
+all_time_ids <- make_all_pp(take)
+
+known_abundance <- left_join(all_time_ids, abundance)
+
+samples <- as.matrix(samples)
+hist(as.matrix(samples[,"M[201]"]))
+known_abundance |> filter(m_id == 201)
+
+all_time_ids |> filter(property == 1)
+abundance |> filter(property == 1)
+take |> filter(property == 1)
+
+
+
+inits <- nimble_inits(nimble_data, nimble_constants, start_density)
+
+source("R/nimble_cluster_model.R")
+Rmodel <- nimbleModel(
+  code = modelCode,
+  constants = nimble_constants,
+  data = nimble_data,
+  inits = inits
+)
+
+Rmodel$initializeInfo()
