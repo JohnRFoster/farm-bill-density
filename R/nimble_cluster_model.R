@@ -1,6 +1,8 @@
 
 library(nimble)
 
+source("R/calc_log_potential_area.R")
+
 modelCode <- nimbleCode({
 
   # priors
@@ -97,7 +99,7 @@ modelCode <- nimbleCode({
   # property abundance = cluster abundance
   for(i in 1:n_single_property_clusters){
     for(t in 1:n_time_single_property_clusters[i]){
-      N[nH[i, t]] <- M[nmH[i, t]]
+      N[nH_single[i, t]] <- M[nmH_single[i, t]]
     }
   }
 
@@ -105,8 +107,8 @@ modelCode <- nimbleCode({
   # distribute based on average density
   for(i in 1:n_multi_property_clusters){
     for(t in 1:n_time_multi_property_clusters[i]){
-      N[nH[i, t]] ~ dpois(d[nH[i, t]])
-      log(d[nH[i, t]]) <- log(M[nmH[i, t]]) - log_cluster_area[i] + log_property_area[i]
+      N[nH_multi[i, t]] ~ dpois(d[i, t])
+      log(d[i, t]) <- log(M[nmH_multi[i, t]]) - log_cluster_area[i] + log_property_area[i]
     }
   }
 
