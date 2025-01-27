@@ -135,36 +135,47 @@ process_model <- function(N, zeta, a_phi, b_phi){
   rpois(n, lambda)
 }
 
-make_all_pp <- function(df, g){
+make_all_pp <- function(df){
 
-  min_max <- df |>
-    rename(x := g) |>
-    select(x, PPNum) |>
-    distinct() |>
-    group_by(x) |>
-    filter(PPNum == min(PPNum) | PPNum == max(PPNum))
+  clusters <- df |>
+    pull(cluster) |>
+    unique()
 
-  x_vec <- min_max |> pull(x) |> unique()
+  all_timesteps <- tibble()
+  for(i in seq_along(clusters)){
 
-  all_pp <- tibble()
-  for(i in x_vec){
-    tmp <- min_max |> filter(x == i)
-    minpp <- min(tmp$PPNum)
-    maxpp <- max(tmp$PPNum)
+    tmp <- df |>
+      filter(cluster == clusters[i])
 
-    tmpp <- tibble(
-      x = i,
-      PPNum = minpp:maxpp
-    )
+    cluster_props <- tmp |>
+      pull(property) |>
+      unique()
 
-    all_pp <- bind_rows(all_pp, tmpp)
+    cluster_pps <- tmp |>
+      pull(PPNum) |>
+      range()
+
+    for(j in seq_along(cluster_props)){
+      tmpp <- tibble(
+        cluster = clusters[i],
+        property = cluster_props[j],
+        PPNum = cluster_pps[1]:cluster_pps[2]
+      )
+
+      all_timesteps <- bind_rows(all_timesteps, tmpp)
+
+    }
 
   }
 
-  all_pp |>
-    group_by(x) |>
-    mutate(timestep = 1:n()) |>
-    ungroup() |>
-    rename(!!sym(g) := x)
+  all_cluster_pp <- all_timesteps |>
+    select(cluster, PPNum) |>
+    distinct() |>
+    mutate(m_id = 1:n())
+
+  all_property_pp <- all_timesteps |>
+    mutate(n_id = 1:n())
+
+  all_time_ids <- left_join(all_property_pp, all_cluster_pp)
 
 }
