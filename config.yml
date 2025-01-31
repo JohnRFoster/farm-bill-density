@@ -1,15 +1,16 @@
 default:
   n_chains: 5
+  project_dir: ""
   data_dir: "data"
   out_dir: "out"
   dev_dir: "test"
+  analysis_dir: "analysis"
   n_pp: 20
   n_mcmc: 500
   n_iter: 1000
 
 hpc_test:
-  project_dir: "farm-bill"
-  analysis_dir: "analysis"
+  project_dir: "/lustrefs/ceah/feral-swine/farm-bill"
 
 hpc_production:
   inherits: hpc_test
