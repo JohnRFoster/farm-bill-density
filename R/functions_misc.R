@@ -32,6 +32,7 @@ make_clusters <- function(max_area, df){
     clust <- cutree(hc, h = d)
 
     df$cluster <- clust + cmin
+    df$cluster_area_km2 <- a
 
     df
 
@@ -73,16 +74,18 @@ make_clusters <- function(max_area, df){
 
       mc <- dfc |> pull(cluster) |> max()
 
-      area_threshold <- max_area * s
-      dfc <- create_clusters(tmp, area_threshold, mc)
+      if(s > 0){
+        area_threshold <- max_area * s
+        dfc <- create_clusters(tmp, area_threshold, mc)
 
-      bad_props <- get_bad_properties(dfc, max_area)
-      dfg <- dfc |> filter(!propertyID %in% bad_props)
+        bad_props <- get_bad_properties(dfc, area_threshold)
+        dfg <- dfc |> filter(!propertyID %in% bad_props)
 
-      if(nrow(dfg) == 0){
-        next
-      } else {
-        all_clusters <- bind_rows(all_clusters, dfg)
+        if(nrow(dfg) == 0){
+          next
+        } else {
+          all_clusters <- bind_rows(all_clusters, dfg)
+        }
       }
 
       if(nrow(all_clusters) == nrow(small_properties)) break
@@ -90,8 +93,10 @@ make_clusters <- function(max_area, df){
       if(s == 0){
         mc <- dfc |> pull(cluster) |> max()
         tmp <- small_properties |>
-          filter(propertyID %in% bad_props) |>
-          mutate(cluster = seq(mc + 1, by = 1, length.out = n()))
+          filter(propertyID %in% bad_props)
+
+        tmp$cluster <- seq(mc + 1, by = 1, length.out = nrow(tmp))
+        tmp$cluster_area_km2 <- tmp$property_area_km2
 
         all_clusters <- bind_rows(all_clusters, tmp)
 
@@ -101,24 +106,43 @@ make_clusters <- function(max_area, df){
 
     mc <- all_clusters |> pull(cluster) |> max()
     large_properties$cluster <- seq(mc + 1, by = 1, length.out = nrow(large_properties))
+    large_properties$cluster_area_km2 <- large_properties$property_area_km2
 
     all_clusters <- bind_rows(all_clusters, large_properties)
   }
 
-  all_clusters <- all_clusters |>
+  cluster_size <- all_clusters |>
+    group_by(cluster) |>
+    summarise(n_props = n()) |>
+    ungroup()
+
+  assertthat::are_equal(sum(cluster_size$n_props), length(unique(df$property)))
+
+  cluster_areas <- all_clusters |>
+    select(cluster, cluster_area_km2) |>
+    distinct()
+
+  check_size <- all_clusters |>
+    group_by(cluster) |>
+    summarise(area = sum(property_area_km2)) |>
+    left_join(cluster_areas) |>
+    mutate(d = cluster_area_km2 - area)
+
+  assertthat::assert_that(all(check_size$d >= 0))
+  assertthat::assert_that(all(!is.na(cluster_areas$cluster_area_km2)))
+  assertthat::assert_that(all(cluster_areas$cluster_area_km2 > 0))
+
+  bad_clusters <- left_join(cluster_areas, cluster_size) |>
+    mutate(drop_flag = if_else(n_props == 1 & cluster_area_km2 < 1.8, 1, 0))
+
+  all_clusters <- left_join(all_clusters, bad_clusters) |>
     mutate(cluster = as.numeric(as.factor(cluster))) |>
     group_by(STATE) |>
     mutate(state_cluster = cluster - min(cluster) + 1) |>
     ungroup() |>
     mutate(state_cluster = paste0(STATE, "-", state_cluster))
 
-  cluster_areas <- all_clusters |>
-    group_by(cluster) |>
-    summarise(cluster_area_km2 = sum(property_area_km2),
-              n_props = n()) |>
-    ungroup()
-
-  larger_than_max_area <- cluster_areas |>
+  larger_than_max_area <- left_join(cluster_areas, cluster_size) |>
     filter(cluster_area_km2 > max_area)
 
   assertthat::assert_that(all(larger_than_max_area$n_props == 1))
@@ -174,6 +198,7 @@ make_all_pp <- function(df){
     mutate(m_id = 1:n())
 
   all_property_pp <- all_timesteps |>
+    arrange(property, PPNum) |>
     mutate(n_id = 1:n())
 
   all_time_ids <- left_join(all_property_pp, all_cluster_pp)
