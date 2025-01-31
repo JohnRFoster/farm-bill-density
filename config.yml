@@ -5,12 +5,14 @@ default:
   out_dir: "out"
   dev_dir: "test"
   analysis_dir: "analysis"
+  posterior_path: "C:/Users/John.Foster/Downloads/iterativeFits2/1_posterior"
   n_pp: 20
   n_mcmc: 500
   n_iter: 1000
 
 hpc_test:
   project_dir: "/lustrefs/ceah/feral-swine/farm-bill"
+  posterior_path: "/lustrefs/ceah/feral-swine/property-fits/iterativeFits2/1_posterior"
 
 hpc_production:
   inherits: hpc_test

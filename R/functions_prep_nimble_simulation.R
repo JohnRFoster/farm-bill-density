@@ -1,5 +1,5 @@
 
-prep_nimble <- function(take){
+prep_nimble <- function(take, posterior_path){
 
   require(dplyr)
   require(tidyr)
@@ -224,6 +224,39 @@ prep_nimble <- function(take){
 
   data_litter_size <- round(data_litter_size)
 
+  rds <- file.path(posterior_path, "posteriorSamples.rds")
+  post <- read_rds(rds)
+
+  get_vec <- function(df, node){
+    df |>
+      select(contains(node)) |>
+      pivot_longer(cols = everything(),
+                   names_to = "node") |>
+      group_by(node) |>
+      summarise(mu = mean(value),
+                tau = 1/var(value))
+  }
+
+  log_rho <- get_vec(post, "log_rho")
+  p_mu <- get_vec(post, "p_mu")
+  log_gamma <- get_vec(post, "log_gamma")
+  beta1 <- get_vec(post, "beta1")
+  beta_p <- get_vec(post, "beta_p")
+  log_nu <- get_vec(post, "log_nu")
+
+  phi_mu <- get_vec(post, "phi_mu")
+  mu <- phi_mu$mu
+  v <- 1 / phi_mu$tau
+  w <- ((mu * (1 - mu)) / v) - 1
+  alpha <- mu * w
+  beta <- (1 - mu) * w
+
+  psi_phi <- get_vec(post, "psi_phi")
+  mu <- psi_phi$mu
+  v <- 1 / psi_phi$tau
+  shape <- (mu^2) / v
+  rate <- mu / v
+
   X <- take |>
     select(c_road_den, c_rugged, c_canopy) |>
     as.matrix()
@@ -258,27 +291,28 @@ prep_nimble <- function(take){
     m_p = ncol(X),
     method = as.numeric(as.factor(take$method)),
     pp_len = 28,
-    phi_mu_a = 3.23,
-    phi_mu_b = 0.2,
-    log_rho_mu = rep(0, 5),
-    log_rho_tau = rep(0.1, 5),
-    p_mu_mu = rep(0, 2),
-    p_mu_tau = rep(1, 2),
-    log_gamma_mu = rep(0, 2),
-    log_gamma_tau = rep(0.1, 2),
-    beta1_mu = rep(0, 5),
-    beta1_tau = rep(1, 5),
-    beta_p_mu = rep(0, 15),
-    beta_p_tau = rep(1, 15),
-    psi_shape = 1,
-    psi_rate = 0.1,
-    log_nu_mu = 2,
-    log_nu_tau = 1,
+    phi_mu_a = alpha,
+    phi_mu_b = beta,
+    log_rho_mu = log_rho$mu,
+    log_rho_tau = log_rho$tau,
+    p_mu_mu = p_mu$mu,
+    p_mu_tau = p_mu$tau,
+    log_gamma_mu = log_gamma$mu,
+    log_gamma_tau = log_gamma$tau,
+    beta1_mu = beta1$mu,
+    beta1_tau = beta1$tau,
+    beta_p_mu = beta_p$mu,
+    beta_p_tau = beta_p$tau,
+    psi_shape = shape,
+    psi_rate = rate,
+    log_nu_mu = log_nu$mu,
+    log_nu_tau = log_nu$tau,
     n_betaP = n_method * ncol(X),
     beta_p_row = rep(1:n_method, each = ncol(X)),
     beta_p_col = rep(1:ncol(X), n_method)
-
   )
+
+
 
   data <- list(
     y = take$take,

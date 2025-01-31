@@ -21,7 +21,7 @@
 #
 # --------------------------------------------------------------------
 
-config_name <- "hpc_test"
+config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
@@ -178,7 +178,7 @@ while(n_method != 5){
 }
 
 message("Prep data for MCMC")
-nimble_ls <- prep_nimble(take) |> suppressMessages()
+nimble_ls <- prep_nimble(take, config$posterior_path) |> suppressMessages()
 nimble_data <- nimble_ls$data
 nimble_constants <- nimble_ls$constants
 
