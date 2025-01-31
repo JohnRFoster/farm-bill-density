@@ -6,60 +6,67 @@ prep_nimble <- function(take){
 
   source("R/functions_misc.R")
 
+  all_obs_ids <- take |>
+    select(cluster, property, PPNum) |>
+    mutate(mcmc_order = 1:n())
+
   all_time_ids <- make_all_pp(take)
 
-  n_clusters <- max(all_time_ids$cluster)
-  n_properties <- max(all_time_ids$property)
+  n_clusters <- max(all_obs_ids$cluster)
+  n_properties <- max(all_obs_ids$property)
 
-  n_time_prop <- all_time_ids |>
-    group_by(property) |>
-    mutate(timestep = 1:n()) |>
-    filter(timestep == max(timestep)) |>
-    pull(timestep)
-
-  assertthat::are_equal(length(n_time_prop), n_properties)
-
-  n_time_clust <- all_time_ids |>
+  cluster_timesteps <- all_time_ids |>
     select(cluster, PPNum) |>
     distinct() |>
     group_by(cluster) |>
     mutate(timestep = 1:n()) |>
+    ungroup()
+
+  assertthat::are_equal(nrow(cluster_timesteps), max(all_time_ids$m_id))
+
+  n_time_clust <- cluster_timesteps |>
+    group_by(cluster) |>
     filter(timestep == max(timestep)) |>
     pull(timestep)
 
+  assertthat::assert_that(min(n_time_clust) >= 2)
   assertthat::are_equal(length(n_time_clust), n_clusters)
 
   mH <- all_time_ids |>
-    select(cluster, PPNum, m_id) |>
+    left_join(cluster_timesteps) |>
+    select(cluster, timestep, m_id) |>
     distinct() |>
-    group_by(cluster) |>
-    mutate(timestep = 1:n()) |>
-    ungroup() |>
-    select(-PPNum) |>
     pivot_wider(names_from = timestep,
-                values_from = m_id) |>
-    select(-cluster)
+                values_from = m_id)
 
+  assertthat::are_equal(mH$cluster, unique(all_obs_ids$cluster))
   assertthat::are_equal(nrow(mH), n_clusters)
 
-  nH <- all_time_ids |>
+  mH <- mH |> select(-cluster)
+
+  property_timesteps <- all_time_ids |>
+    select(property, PPNum) |>
+    distinct() |>
     group_by(property) |>
     mutate(timestep = 1:n()) |>
-    ungroup() |>
+    ungroup()
+
+  nH <- all_time_ids |>
+    left_join(property_timesteps) |>
     select(property, timestep, n_id) |>
     pivot_wider(names_from = timestep,
                 values_from = n_id)
 
+  assertthat::are_equal(nH$property, unique(all_obs_ids$property))
   assertthat::are_equal(nrow(nH), n_properties)
 
   nmH <- all_time_ids |>
-    group_by(property) |>
-    mutate(timestep = 1:n()) |>
-    ungroup() |>
+    left_join(property_timesteps) |>
     select(property, timestep, m_id) |>
     pivot_wider(names_from = timestep,
                 values_from = m_id)
 
+  assertthat::are_equal(nmH$property, unique(all_obs_ids$property))
   assertthat::are_equal(max(nmH, na.rm = TRUE), max(mH, na.rm = TRUE))
   assertthat::are_equal(nrow(nmH), n_properties)
 
@@ -92,8 +99,8 @@ prep_nimble <- function(take){
 
   n_time_single_property_clusters <- all_time_ids |>
     filter(property %in% solo_properties) |>
+    left_join(property_timesteps) |>
     group_by(property) |>
-    mutate(timestep = 1:n()) |>
     filter(timestep == max(timestep)) |>
     pull(timestep)
 
@@ -169,16 +176,22 @@ prep_nimble <- function(take){
     mutate(sum_take = if_else(is.na(sum_take), 0, sum_take)) |>
     select(cluster, timestep, sum_take) |>
     pivot_wider(names_from = timestep,
-                values_from = sum_take) |>
-    select(-cluster)
+                values_from = sum_take)
 
+  assertthat::are_equal(removed_timestep$cluster, unique(all_obs_ids$cluster))
+
+  removed_timestep <- removed_timestep |> select(-cluster)
   assertthat::are_equal(dim(removed_timestep), dim(mH))
 
   tH <- take |>
     select(property, PPNum)
 
-  nH_p <- left_join(tH, all_time_ids) |> pull(n_id)
+  nH_p <- left_join(tH, all_time_ids)
 
+  assertthat::are_equal(unique(nH_p$property), unique(all_obs_ids$property))
+  assertthat::are_equal(unique(nH_p$cluster), unique(all_obs_ids$cluster))
+
+  nH_p <- nH_p$n_id
   assertthat::are_equal(length(nH_p),  nrow(take))
 
   n_observed_units <- take |>
@@ -189,7 +202,7 @@ prep_nimble <- function(take){
   assertthat::are_equal(length(unique(nH_p)), n_observed_units)
 
   cluster_areas <- take |>
-    filter(!property %in% solo_properties) |>
+    filter(property %in% grouped_properties) |>
     select(property, cluster_area_km2) |>
     distinct() |>
     pull(cluster_area_km2)
@@ -197,7 +210,7 @@ prep_nimble <- function(take){
   assertthat::are_equal(length(cluster_areas), n_grouped_properties)
 
   property_areas <- take |>
-    filter(!property %in% solo_properties) |>
+    filter(property %in% grouped_properties) |>
     select(property, property_area_km2) |>
     distinct() |>
     pull(property_area_km2)
@@ -287,7 +300,7 @@ prep_nimble <- function(take){
   )
 }
 
-nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 1000){
+nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 100){
 
   params <- read_csv("../pigs-property/data/posterior_95CI_range_all.csv") |>
     suppressMessages()
