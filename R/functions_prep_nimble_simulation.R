@@ -302,7 +302,7 @@ prep_nimble <- function(take){
 
 nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 100){
 
-  params <- read_csv("../pigs-property/data/posterior_95CI_range_all.csv") |>
+  params <- read_csv("data/posterior_95CI_range_all.csv") |>
     suppressMessages()
 
   draw_value <- function(x){
