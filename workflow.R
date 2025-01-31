@@ -212,7 +212,7 @@ samples <- fit_mcmc(
 
 stopCluster(cl)
 
-out_dir <- file.path(config$out_dir, config$dev_dir, task_id)
+out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, task_id)
 message("\n\nWriting to: ", out_dir)
 
 if(!dir.exists(out_dir)) dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
