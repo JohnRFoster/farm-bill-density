@@ -8,7 +8,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   source("R/functions_removal.R")
   source("R/functions_misc.R")
 
-  effort_data <- read_csv("../multi-method-removal-model/data/effort_data.csv") |>
+  effort_data <- read_csv("data/effort_data.csv") |>
     mutate(method_name = if_else(method_name == "TRAPS, CAGE", "TRAPS", method_name)) |>
     suppressMessages()
 
@@ -20,7 +20,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   start_density <- start_density
   hierarchy <- "Poisson"
 
-  params <- read_csv("../pigs-property/data/posterior_95CI_range_all.csv") |>
+  params <- read_csv("data/posterior_95CI_range_all.csv") |>
     suppressMessages()
 
   draw_value <- function(x){
