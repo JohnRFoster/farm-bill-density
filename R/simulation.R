@@ -64,10 +64,12 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   pb <- txtProgressBar(max = n_clusters, style = 1)
   for(i in seq_len(n_clusters)){
 
-    area <- cluster_area[i]
-
     properties_in_cluster <- cluster_props |>
       filter(cluster == i)
+
+    if(properties_in_cluster$drop_flag[1] == 1) next
+
+    area <- cluster_area[i]
 
     propertyIDs <- properties_in_cluster |>
       pull(propertyID)
