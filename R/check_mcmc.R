@@ -23,7 +23,7 @@ check_mcmc <- function(samples, nodes_check, n_mcmc = 1000, dest = NULL){
   params_burn <- samples_burn_mcmc[, j]
 
   if(!is.null(dest)){
-    write_rds(list(params_burn), file.path(dest, "parameters_burnin.rds"))
+    write_rds(list(params_burn), file.path(dest, "parameterSamples.rds"))
   }
 
   samples_burn_mat <- as.matrix(samples_burn_mcmc)
