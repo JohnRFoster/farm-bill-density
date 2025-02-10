@@ -11,7 +11,7 @@ check_mcmc <- function(samples, nodes_check, n_mcmc = 1000, dest = NULL){
 
   total_iter <- nrow(params[[1]])
   n_chains <- length(params)
-  GBR <- gelman.plot(params)
+  GBR <- gelman.plot(params, ask = FALSE)
   burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[, , 2] > 1.1, 1, any)), 1) + 1]
   message("Burnin: ", burnin)
 
@@ -27,9 +27,10 @@ check_mcmc <- function(samples, nodes_check, n_mcmc = 1000, dest = NULL){
   print(effective_samples)
 
   if(!is.null(dest)){
-    write_rds(list(params_burn), file.path(dest, "parameterSamples.rds"))
+    write_rds(list(params_burnin), file.path(dest, "parameterSamples.rds"))
   }
 
+  samples_burn_mcmc <- window(samples, start = burnin)
   samples_burn_mat <- as.matrix(samples_burn_mcmc)
   draws <- sample.int(nrow(samples_burn_mat), n_mcmc, replace = TRUE)
 
