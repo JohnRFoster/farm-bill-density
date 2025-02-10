@@ -9,18 +9,22 @@ check_mcmc <- function(samples, nodes_check, n_mcmc = 1000, dest = NULL){
 
   params <- samples[,j]
 
+  total_iter <- nrow(params[[1]])
+  n_chains <- length(params)
+  GBR <- gelman.plot(params)
+  burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[, , 2] > 1.1, 1, any)), 1) + 1]
+  message("Burnin: ", burnin)
+
+  if(is.na(burnin)) burnin <- round(total_iter / 2)
+  params_burnin <- window(params, start = burnin)
+
   message("Calculating PSRF...")
-  psrf <- gelman.diag(params, multivariate = FALSE)
+  psrf <- gelman.diag(params_burnin, multivariate = FALSE)
   print(psrf)
 
   message("Calculating effective samples...")
   effective_samples <- effectiveSize(params)
   print(effective_samples)
-
-  burnin <- 1
-
-  samples_burn_mcmc <- window(samples, start = burnin)
-  params_burn <- samples_burn_mcmc[, j]
 
   if(!is.null(dest)){
     write_rds(list(params_burn), file.path(dest, "parameterSamples.rds"))
