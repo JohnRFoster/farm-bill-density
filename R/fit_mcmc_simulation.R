@@ -1,4 +1,4 @@
-fit_mcmc <- function(cl, modelCode, data, constants, start_density,
+fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
                      n_iter, n_chains, custom_samplers = NULL, monitors_add = NULL){
 
   require(nimble)
@@ -17,7 +17,7 @@ fit_mcmc <- function(cl, modelCode, data, constants, start_density,
   clusterExport(cl, export, envir = environment())
 
   for(i in seq_along(cl)){
-    set.seed(i)
+    set.seed(task_seed + i)
     init <- nimble_inits(data, constants, start_density)
     clusterExport(cl[i], "init", envir = environment())
   }
