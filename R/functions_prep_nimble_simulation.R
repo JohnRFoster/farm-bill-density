@@ -336,26 +336,27 @@ prep_nimble <- function(take, posterior_path){
 
 nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 100){
 
-  params <- read_csv("data/posterior_95CI_range_all.csv") |>
-    suppressMessages()
+  params <- read_rds("data/posteriorSamples.rds")
+  params <- params |> slice(sample.int(nrow(params), 1))
 
   draw_value <- function(x){
     params |>
-      filter(grepl(x, node)) |>
-      pull(med) |>
-      round(2) |>
+      select(contains(x)) |>
+      pivot_longer(cols = everything()) |>
+      pull(value) |>
       jitter()
+
   }
 
   constants_nimble$phi_mu <- draw_value("phi_mu")
   constants_nimble$psi_phi <- draw_value("psi_phi")
-  nu <- draw_value("nu")
-  constants_nimble$zeta <- 28 * nu / 365
-  constants_nimble$beta_p <- matrix(draw_value("beta_p"), 5, 3, byrow = TRUE)
+  log_nu <- draw_value("log_nu")
+  constants_nimble$zeta <- 28 * exp(log_nu) / 365
+  constants_nimble$beta_p <- matrix(draw_value("beta_p"), 5, 3)
   constants_nimble$beta1 <- draw_value("beta1")
-  constants_nimble$omega <- draw_value("omega")
-  constants_nimble$gamma <- draw_value("gamma")
-  constants_nimble$rho <- draw_value("rho")
+  constants_nimble$omega <- draw_value("p_mu")
+  constants_nimble$log_gamma <- draw_value("gamma")
+  constants_nimble$log_rho <- draw_value("rho")
 
   # for testing
   # attach(constants_nimble)
@@ -367,12 +368,12 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     b <- (1 - phi_mu) * psi_phi
     M <- phi <- lambda <- rep(NA, max(mH, na.rm = TRUE))
     M_init <- rep(NA, n_cluster)
-    i=1
+    # i=1
     for(i in 1:n_cluster){
 
       M_init[i] <- round(exp(log_cluster_area[i])*start_density + sum(rem[i, ], na.rm = TRUE))
       M[mH[i, 1]] <- M_init[i]
-      j=2
+      # j=2
       for(j in 2:n_time_clust[i]){
 
         phi[mH[i, j-1]] <- rbeta(1, a, b)
@@ -411,8 +412,8 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       log_lambda_1 = log(M_init + buffer),
       beta_p = beta_p,
       beta1 = beta1,
-      p_mu = boot::logit(omega),
-      p_unique = omega,
+      p_mu = omega,
+      p_unique =  boot::inv.logit(omega),
       phi_mu = phi_mu,
       psi_phi = psi_phi,
       a_phi = a,
@@ -420,10 +421,9 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       N = N + buffer,
       M = M + buffer,
       # lambda = lambda + buffer,
-      log_nu = log(nu),
-      nu = nu,
-      log_gamma = log(gamma),
-      log_rho = log(rho),
+      log_nu = log_nu,
+      log_gamma = log_gamma,
+      log_rho = log_rho,
       phi = phi,
       zeta = zeta,
       log_zeta = log(zeta)
