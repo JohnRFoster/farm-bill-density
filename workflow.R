@@ -13,7 +13,7 @@
 # 2. run_simulation
 #   - Simulate/bootstrap data
 #     - 1-method properties
-#     - 2- to 5-method properties
+#     - 2- to 4-method properties
 #   - Simulate eco/take dynamics
 #   - Fit MCMC
 #   - Check MCMC
@@ -21,7 +21,7 @@
 #
 # --------------------------------------------------------------------
 
-config_name <- "hpc_production"
+config_name <- "default"
 config <- config::get(config = config_name)
 interval <- 4
 
@@ -200,6 +200,7 @@ cl <- makeCluster(n_chains)
 
 samples <- fit_mcmc(
   cl = cl,
+  task_seed = task_id,
   modelCode = modelCode,
   data = nimble_ls$data,
   constants = nimble_ls$constants,
