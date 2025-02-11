@@ -121,6 +121,10 @@ method_1 <- one_method_properties(df_with_timesteps, n_rel$n_simulate[1], n_pp)
 # n-method properties ----
 # -----------------------------------------------------------------
 
+
+start_density <- round(runif(1, 0.3, 5), 3)
+message("Starting density: ", start_density)
+
 n_method <- 0
 while(n_method != 5){
 
@@ -158,12 +162,11 @@ while(n_method != 5){
   summary(n_per_cluster$n)
   hist(n_per_cluster$n, breaks = 20)
 
-  start_density <- round(runif(1, 0.3, 5), 3)
+
   cluster_props <- all_clusters
 
 
   message("\nSimulate cluster dynamics")
-  message("Starting density: ", start_density)
   simulated_data <- simulate_cluster_dynamics(
     start_density = start_density,
     cluster_props = all_clusters,
