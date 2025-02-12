@@ -27,7 +27,7 @@ interval <- 4
 
 if(grepl("hpc", config_name)){
   Sys.setenv(RENV_CONFIG_SANDBOX_ENABLED = FALSE)
-  renv::load("/home/john.foster/pigs-simulation/")
+  renv::load("/home/john.foster/farm-bill-density/")
 
   args <- commandArgs(trailingOnly = TRUE)
   task_id <- args[1]
