@@ -25,9 +25,17 @@ config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
-args <- commandArgs(trailingOnly = TRUE)
-task_id <- args[1]
-if(is.na(task_id)) task_id <- 1
+if(grepl("hpc", config_name)){
+  Sys.setenv(RENV_CONFIG_SANDBOX_ENABLED = FALSE)
+  renv::load("/home/john.foster/pigs-simulation/")
+
+  args <- commandArgs(trailingOnly = TRUE)
+  task_id <- args[1]
+
+} else {
+  task_id <- 1
+}
+
 message("Task ID: ", task_id)
 
 
