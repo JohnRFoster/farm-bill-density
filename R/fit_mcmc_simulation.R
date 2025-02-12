@@ -58,6 +58,13 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
       }
     }
 
+    for(i in 1:5){
+      node <- paste0("beta_p[", i, ", ", 1:constants$m_p, "]")
+      node <- c(paste0("beta1[", i, "]"), node)
+      mcmcConf$removeSampler(node)
+      mcmcConf$addSampler(node, "AF_slice")
+    }
+
     Rmcmc <- buildMCMC(mcmcConf)
     Cmodel <- compileNimble(Rmodel)
     Cmcmc <- compileNimble(Rmcmc)
