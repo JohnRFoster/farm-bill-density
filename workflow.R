@@ -309,8 +309,6 @@ property_areas <- take |>
   select(cluster, property, cluster_area_km2, property_area_km2) |>
   distinct()
 
-# need to add abundance metrics
-
 M_join <- left_join(M_samples, M_known) |>
   left_join(cluster_areas) |>
   mutate(estimated_density = value / cluster_area_km2,

@@ -10,8 +10,7 @@ check_mcmc <- function(samples, nodes_check, n_mcmc = 1000, dest = NULL){
   params <- samples[,j]
 
   total_iter <- nrow(params[[1]])
-  n_chains <- length(params)
-  GBR <- gelman.plot(params, ask = FALSE)
+  GBR <- gelman.plot(params)
   burnin <- GBR$last.iter[tail(which(apply(GBR$shrink[, , 2] > 1.1, 1, any)), 1) + 1]
   message("Burnin: ", burnin)
 
