@@ -16,7 +16,7 @@ hpc_test:
 
 hpc_production:
   inherits: hpc_test
-  dev_dir: "afSliceTest"
+  dev_dir: "production"
   n_pp: 40
   n_mcmc: 1000
   n_iter: 500000
