@@ -55,9 +55,11 @@ for(i in seq_along(sim_files)){
 
   task_id <- sim_files[i]
 
-  out_file <- file.path(out_dir, task_id, "parameterSamples.rds")
+  task_dir <- file.path(out_dir, task_id)
+  out_file <- file.path(task_dir, "parameterSamples.rds")
 
-  if(grepl("mcmcTimeseries_", list.files(file.path(out_dir, task_id)))) next
+  traceplots_exist <- any(grepl("mcmcTimeseries_", list.files(task_dir)))
+  if(traceplots_exist) next
 
   if(file.exists(out_file)){
     params_mcmc_list <- read_rds(out_file)[[1]]
@@ -100,7 +102,7 @@ for(i in seq_along(sim_files)){
 
     gg <- trace_plot(posterior, n2p)
 
-    filename <- file.path(out_dir, task_id, paste0("mcmcTimeseries_", sprintf("%03d", i), ".pdf"))
+    filename <- file.path(task_dir, paste0("mcmcTimeseries_", sprintf("%03d", i), ".pdf"))
     ggsave(filename, gg)
 
     setTxtProgressBar(pb, j)
