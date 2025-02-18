@@ -105,7 +105,7 @@ for(i in seq_along(sim_files)){
 
     gg <- trace_plot(posterior, n2p)
 
-    filename <- file.path(task_dir, paste0("mcmcTimeseries_", sprintf("%03d", i), ".pdf"))
+    filename <- file.path(task_dir, paste0("mcmcTimeseries_", sprintf("%03d", j), ".pdf"))
     ggsave(filename, gg)
 
     setTxtProgressBar(pb, j)
