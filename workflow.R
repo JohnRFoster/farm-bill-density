@@ -209,6 +209,11 @@ params_check <- c(
 n_chains <- config$n_chains
 cl <- makeCluster(n_chains)
 
+c_samp <- tibble(
+  node = c("phi_mu", "psi_phi"),
+  type = c("slice",  "slice")
+)
+
 samples <- fit_mcmc(
   cl = cl,
   task_seed = task_id,
@@ -218,7 +223,7 @@ samples <- fit_mcmc(
   start_density = start_density,
   n_iter = config$n_iter,
   n_chains = n_chains,
-  custom_samplers = NULL,
+  custom_samplers = c_samp,
   monitors_add
 )
 
