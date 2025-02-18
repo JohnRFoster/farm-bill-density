@@ -61,8 +61,8 @@ for(i in seq_along(sim_files)){
 
   out_file <- file.path(task_dir, "parameterSamples.rds")
 
-  traceplots_exist <- any(grepl("mcmcTimeseries_", list.files(task_dir)))
-  if(traceplots_exist) next
+  # traceplots_exist <- any(grepl("mcmcTimeseries_", list.files(task_dir)))
+  # if(traceplots_exist) next
 
   if(file.exists(out_file)){
     params_mcmc_list <- read_rds(out_file)[[1]]
