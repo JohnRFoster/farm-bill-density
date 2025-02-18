@@ -56,6 +56,9 @@ for(i in seq_along(sim_files)){
   task_id <- sim_files[i]
 
   task_dir <- file.path(out_dir, task_id)
+  message("\n\n====", task_dir, "====")
+
+
   out_file <- file.path(task_dir, "parameterSamples.rds")
 
   traceplots_exist <- any(grepl("mcmcTimeseries_", list.files(task_dir)))
