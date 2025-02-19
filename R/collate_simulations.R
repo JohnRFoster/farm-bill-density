@@ -36,7 +36,7 @@ for(i in seq_along(sim_files)){
     good <- all(psrf[,1] <= 1.1)
 
     if(good){
-      start_density <- out$start_density
+      start_density <- out_data$start_density
 
       take <- out_data$take |> mutate(start_density = start_density, simulation = task_id)
       all_take <- bind_rows(all_take, take)
