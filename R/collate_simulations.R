@@ -17,6 +17,8 @@ all_N_by_time <- tibble()
 all_N_by_property <- tibble()
 all_N_by_cluster <- tibble()
 
+pb <- txtProgressBar(max = length(sim_files), style = 1)
+
 for(i in seq_along(sim_files)){
 
   task_id <- sim_files[i]
@@ -56,7 +58,9 @@ for(i in seq_along(sim_files)){
 
     }
   }
+  setTxtProgressBar(pb, i)
 }
+close(pb)
 
 dest <- file.path(config$project_dir, config$analysis_dir)
 
