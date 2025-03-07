@@ -161,7 +161,22 @@ while(n_method != 5){
 
   all_clusters <- make_clusters(250, gps_info)
 
+  # assign projects
+  clusters <- unique(all_clusters$cluster)
   n_clusters <- length(unique(all_clusters$state_cluster))
+
+  # each project gets multiple clusters
+  # at least two clusters per project
+  project_vec <- 1
+  i <- 1
+  while(length(project_vec) < n_clusters){
+    nc <- round(runif(1, 1.5, 14.4))
+    tmp <- rep(i, nc)
+    project_vec <- c(project_vec, tmp)
+    i <- i + 1
+  }
+
+  project_vec <- project_vec[1:n_clusters]
 
   n_per_cluster <- all_clusters |>
     group_by(state_cluster) |>
@@ -170,14 +185,18 @@ while(n_method != 5){
   summary(n_per_cluster$n)
   hist(n_per_cluster$n, breaks = 20)
 
+  project_lookup <- tibble(
+    cluster = clusters,
+    project = project_vec
+  )
 
-  cluster_props <- all_clusters
-
+  cluster_props <- all_clusters |>
+    left_join(project_lookup)
 
   message("\nSimulate cluster dynamics")
   simulated_data <- simulate_cluster_dynamics(
     start_density = start_density,
-    cluster_props = all_clusters,
+    cluster_props = cluster_props,
     properties = properties
   )
 

@@ -51,6 +51,8 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
 
   n_clusters <- max(cluster_props$cluster)
 
+  #### START HERE WITH CLUSTER AND PROJECT RANDOM EFFECTS
+
   p_unique <- omega
 
   cluster_area <- cluster_props |>

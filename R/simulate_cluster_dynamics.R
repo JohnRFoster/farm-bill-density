@@ -84,7 +84,7 @@ simulate_cluster_dynamics <- function(
 
       # conduct removals
       take_t <- conduct_removals(N[t], removal_order, effort_data, log_survey_area, X, beta_p, pp,
-                                 log_rho, log_gamma, p_unique, method_lookup)
+                                 log_rho, log_gamma, p_unique, method_lookup, alpha_project, alpha_cluster)
       take <- bind_rows(take, take_t)
 
       # how many pigs are left?
