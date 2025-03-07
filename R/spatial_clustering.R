@@ -75,19 +75,31 @@ write_csv(all_lat_lon, "data/farmBillTakeGoodStates.csv")
 
 # ignoring project for now
 gps_info <- all_lat_lon |>
-  select(propertyID, Project, STATE, FIPS, property_area_km2, Long, Lat) |>
+  select(Project, propertyID, Project, STATE, FIPS, property_area_km2, Long, Lat) |>
   distinct()
 
 # =======================
 # TODO
 # check there isn't too much overlap in property ID and cluster ID
-#    if there is a lot of overlap wont be identifable
-# get landcover information for property latlon
-# =======================
+#    Projects have multiple clusters
+#    Most clusters belong to a single project
 
 all_clusters <- make_clusters(max_area, gps_info)
 
 write_csv(all_clusters, "data/clusters250km2.csv")
+
+
+projs <- all_clusters |> pull(Project) |> unique()
+for(i in seq_along(projs)){
+  tmp <- all_clusters |>
+    filter(Project == projs[i]) |>
+    pull(cluster) |>
+    unique()
+
+  message("Project ", projs[i])
+  print(tmp)
+
+}
 
 
 assertthat::are_equal(nrow(all_clusters), nrow(gps_info))
