@@ -37,6 +37,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   beta1 <- matrix(draw_value("beta1"), 5, 1)
   beta <- cbind(beta1, beta_p)
   omega <- draw_value("omega")
+  p_unique <- omega
   gamma <- draw_value("gamma")
   log_gamma <- log(gamma)
   rho <- draw_value("rho")
@@ -49,17 +50,35 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   # there can be up to m0 primary periods after all pigs are gone before we drop data
   m0 <- 6
 
+  n_projects <- max(cluster_props$project)
   n_clusters <- max(cluster_props$cluster)
 
-  #### START HERE WITH CLUSTER AND PROJECT RANDOM EFFECTS
+  # project and cluster random effects
+  mu_project <- runif(1, -5, 5)
+  mu_cluster <- runif(1, -5, 5)
 
-  p_unique <- omega
+  tau_project <- runif(1, 1e-4, 100)
+  tau_cluster <- runif(1, 1e-4, 100)
 
-  cluster_area <- cluster_props |>
-    group_by(cluster) |>
-    summarise(cluster_area = sum(property_area_km2)) |>
-    ungroup() |>
-    pull(cluster_area)
+  project_lookup <- tibble(
+    project = 1:n_projects,
+    mu_project = mu_project,
+    tau_project = tau_project,
+    alpha_project = rnorm(n_projects, mu_project, 1/sqrt(tau_project))
+  )
+
+  cluster_lookup <- tibble(
+    cluster = 1:n_clusters,
+    mu_cluster = mu_cluster,
+    tau_cluster = tau_cluster,
+    alpha_cluster = rnorm(n_clusters, mu_cluster, 1/sqrt(tau_cluster))
+  )
+
+  group_lookup <- cluster_props |>
+    select(propertyID, project, cluster) |>
+    distinct() |>
+    left_join(project_lookup) |>
+    left_join(cluster_lookup)
 
   all_take <- all_pigs <- tibble()
 
@@ -71,13 +90,15 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
 
     if(properties_in_cluster$drop_flag[1] == 1) next
 
-    area <- cluster_area[i]
+    area <- properties_in_cluster$cluster_area_km2[1]
+    propertyIDs <- properties_in_cluster$propertyID
+    survey_area <- properties_in_cluster$property_area_km2
+    project <- properties_in_cluster$project
 
-    propertyIDs <- properties_in_cluster |>
-      pull(propertyID)
+    cp_group <- group_lookup |> filter(propertyID %in% propertyIDs)
 
-    survey_area <- properties_in_cluster |>
-      pull(property_area_km2)
+    project_re <- cp_group$alpha_project
+    cluster_re <- cp_group$alpha_cluster
 
     log_survey_area <- log(survey_area)
 
@@ -141,13 +162,25 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
           # conduct removals
           nn <- N[j, t]
 
-          take_t <- conduct_removals(nn, removal_order, effort_data, log_survey_area[j],
-                                     X[j,], beta, t,
-                                     log_rho, log_gamma, p_unique, method_lookup) |>
+          take_t <- conduct_removals(
+            N = nn,
+            removal_order = removal_order,
+            effort_data = effort_data,
+            log_survey_area = log_survey_area[j],
+            X = X[j,],
+            beta_p = beta,
+            pp = t,
+            log_rho = log_rho,
+            log_gamma = log_gamma,
+            p_unique = p_unique,
+            method_lookup = method_lookup,
+            alpha_project = project_re[j],
+            alpha_cluster = cluster_re[j]) |>
             mutate(propertyID = propertyIDs[j],
                    property_area_km2 = survey_area[j],
                    cluster_area_km2 = area,
                    cluster = i,
+                   project = project[j],
                    N = nn,
                    M = M[t],
                    M_actual = M_actual[t],
@@ -239,9 +272,10 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
     pull(cluster) |>
     unique()
 
-  all_take <- all_take |>
+  all_take <- left_join(all_take, group_lookup) |>
     filter(cluster %in% good_clusters) |>
     mutate(cluster = as.numeric(as.factor(cluster)),
+           project = as.numeric(as.factor(project)),
            property = as.numeric(as.factor(propertyID))) |>
     arrange(property, PPNum, order)
 
@@ -250,6 +284,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
            cluster %in% good_clusters,
            propertyID %in% unique(all_take$propertyID)) |>
     mutate(cluster = as.numeric(as.factor(cluster)),
+           project = as.numeric(as.factor(project)),
            property = as.numeric(as.factor(propertyID))) |>
     arrange(property, PPNum)
 

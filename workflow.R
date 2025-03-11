@@ -212,17 +212,23 @@ nimble_ls <- prep_nimble(take, config$posterior_path) |> suppressMessages()
 nimble_data <- nimble_ls$data
 nimble_constants <- nimble_ls$constants
 
-monitors_add <- c("N", "M")
+monitors_add <- c("N", "M", "alpha_cluster", "alpha_project")
 
 params_check <- c(
-  "beta_p",
+  "alpha_cluster",
+  "alpha_project",
   "beta1",
+  "beta_p",
   "log_gamma",
+  "log_nu",
   "log_rho",
+  "mu_cluster",
+  "mu_project",
+  "p_mu",
   "phi_mu",
   "psi_phi",
-  "log_nu",
-  "p_mu"
+  "tau_cluster",
+  "tau_project"
 )
 
 n_chains <- config$n_chains
@@ -240,10 +246,11 @@ samples <- fit_mcmc(
   data = nimble_ls$data,
   constants = nimble_ls$constants,
   start_density = start_density,
-  n_iter = config$n_iter,
+  n_iter = 100000,
+  # n_iter = config$n_iter,
   n_chains = n_chains,
   custom_samplers = c_samp,
-  monitors_add
+  monitors_add = monitors_add
 )
 
 stopCluster(cl)
@@ -425,4 +432,6 @@ message("\nPercent recovered: property density (observed)")
 N_by_time_observed <- N_by_time |> filter(observation_flag == 1)
 round(sum(N_by_time_observed$recovered_flag) / nrow(N_by_time_observed) * 100, 1)
 
+### start here with parameter recovery
+### TODO ASAP pick property or property ID and stick to one
 

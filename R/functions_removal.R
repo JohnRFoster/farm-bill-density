@@ -36,7 +36,7 @@ generate_take_data <- function(m, effort_data){
 }
 
 conduct_removals <- function(N, removal_order, effort_data, log_survey_area, X, beta_p, pp,
-                             log_rho, log_gamma, p_unique, method_lookup, alphs_project, alpha_cluster){
+                             log_rho, log_gamma, p_unique, method_lookup, alpha_project, alpha_cluster){
 
   n_reps <- length(removal_order)
   log_theta <- C <- rep(NA, n_reps)
@@ -73,9 +73,10 @@ conduct_removals <- function(N, removal_order, effort_data, log_survey_area, X, 
         beta_p[m, 1] +
           beta_p[m, 2] * X[1] +
           beta_p[m, 3] * X[2] +
-          beta_p[m, 4] * X[3]) +
+          beta_p[m, 4] * X[3] +
         alpha_project +
-        alpha_cluster) +
+        alpha_cluster)
+      ) +
       min(0, log_potential_area - log_survey_area)
 
     if(r == 1){
@@ -88,6 +89,11 @@ conduct_removals <- function(N, removal_order, effort_data, log_survey_area, X, 
 
     # remove
     C[r] <- min(rpois(1, n_avail * p), n_avail)
+
+    is.wholenumber <-
+      function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
+
+    assertthat::assert_that(is.wholenumber(C[r]))
 
     et <- tibble(
       PPNum = pp,

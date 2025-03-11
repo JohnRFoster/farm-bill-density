@@ -12,8 +12,11 @@ prep_nimble <- function(take, posterior_path){
 
   all_time_ids <- make_all_pp(take)
 
-  n_clusters <- max(all_obs_ids$cluster)
   n_properties <- max(all_obs_ids$property)
+  project <- take$project
+  n_projects <- length(unique(project))
+  cluster <- take$cluster
+  n_clusters <- length(unique(cluster))
 
   cluster_timesteps <- all_time_ids |>
     select(cluster, PPNum) |>
@@ -264,7 +267,8 @@ prep_nimble <- function(take, posterior_path){
   n_method <- length(unique(take$method))
 
   constants <- list(
-    n_cluster = n_clusters,
+    n_clusters = n_clusters,
+    n_projects = n_projects,
     n_survey = nrow(take),
     n_ls = length(data_litter_size),
     n_method = n_method,
@@ -280,6 +284,8 @@ prep_nimble <- function(take, posterior_path){
     nH_multi = as.matrix(nH_multi),
     nmH_single = as.matrix(nmH_single),
     nmH_multi = as.matrix(nmH_multi),
+    cluster = cluster,
+    project = project,
     start = take$start,
     end = take$end,
     y_sum = y_sum,
@@ -367,9 +373,9 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     a <- phi_mu * psi_phi
     b <- (1 - phi_mu) * psi_phi
     M <- phi <- lambda <- rep(NA, max(mH, na.rm = TRUE))
-    M_init <- rep(NA, n_cluster)
+    M_init <- rep(NA, n_clusters)
     # i=1
-    for(i in 1:n_cluster){
+    for(i in 1:n_clusters){
 
       M_init[i] <- round(exp(log_cluster_area[i])*start_density + sum(rem[i, ], na.rm = TRUE))
       M[mH[i, 1]] <- M_init[i]
@@ -426,7 +432,13 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       log_rho = log_rho,
       phi = phi,
       zeta = zeta,
-      log_zeta = log(zeta)
+      log_zeta = log(zeta),
+      mu_project = rnorm(1, 0, 0.01),
+      mu_cluster = rnorm(1, 0, 0.01),
+      tau_project = runif(1, 1, 5),
+      tau_cluster = runif(1, 1, 5),
+      alpha_project = rnorm(n_projects, 0, 1),
+      alpha_cluster = rnorm(n_clusters, 0, 1)
     )
 
   })
