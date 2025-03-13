@@ -1,5 +1,5 @@
 
-simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
+simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
 
   library(dplyr)
   library(tidyr)
@@ -50,32 +50,30 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   # there can be up to m0 primary periods after all pigs are gone before we drop data
   m0 <- 6
 
-  n_projects <- max(cluster_props$project)
-  n_clusters <- max(cluster_props$cluster)
+  projects <- unique(cluster_props$project)
+  clusters <- unique(cluster_props$cluster)
+
+  n_projects <- length(projects)
+  n_clusters <- length(clusters)
 
   # project and cluster random effects
-  mu_project <- runif(1, -5, 5)
-  mu_cluster <- runif(1, -5, 5)
-
   tau_project <- runif(1, 1e-4, 100)
   tau_cluster <- runif(1, 1e-4, 100)
 
   project_lookup <- tibble(
-    project = 1:n_projects,
-    mu_project = mu_project,
+    project = projects,
     tau_project = tau_project,
-    alpha_project = rnorm(n_projects, mu_project, 1/sqrt(tau_project))
+    alpha_project = rnorm(n_projects, 0, 1/sqrt(tau_project))
   )
 
   cluster_lookup <- tibble(
-    cluster = 1:n_clusters,
-    mu_cluster = mu_cluster,
+    cluster = clusters,
     tau_cluster = tau_cluster,
-    alpha_cluster = rnorm(n_clusters, mu_cluster, 1/sqrt(tau_cluster))
+    alpha_cluster = rnorm(n_clusters, 0, 1/sqrt(tau_cluster))
   )
 
   group_lookup <- cluster_props |>
-    select(propertyID, project, cluster) |>
+    select(property, project, cluster) |>
     distinct() |>
     left_join(project_lookup) |>
     left_join(cluster_lookup)
@@ -85,17 +83,17 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
   pb <- txtProgressBar(max = n_clusters, style = 1)
   for(i in seq_len(n_clusters)){
 
-    properties_in_cluster <- cluster_props |>
-      filter(cluster == i)
+    prop_tmp_in_cluster <- cluster_props |>
+      filter(cluster == clusters[i])
 
-    if(properties_in_cluster$drop_flag[1] == 1) next
+    if(prop_tmp_in_cluster$drop_flag[1] == 1) next
 
-    area <- properties_in_cluster$cluster_area_km2[1]
-    propertyIDs <- properties_in_cluster$propertyID
-    survey_area <- properties_in_cluster$property_area_km2
-    project <- properties_in_cluster$project
+    area <- prop_tmp_in_cluster$cluster_area_km2[1]
+    prop_tmp <- prop_tmp_in_cluster$property
+    survey_area <- prop_tmp_in_cluster$property_area_km2
+    project <- prop_tmp_in_cluster$project
 
-    cp_group <- group_lookup |> filter(propertyID %in% propertyIDs)
+    cp_group <- group_lookup |> filter(property %in% prop_tmp)
 
     project_re <- cp_group$alpha_project
     cluster_re <- cp_group$alpha_cluster
@@ -116,17 +114,18 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
     # skip clusters that go extinct
     if(Mspin == 0) next
 
-    # distribute based on density
-    d <- Mspin / area * survey_area
-
     N <- matrix(NA, n_props, n_pp)
     M <- M_actual <- rep(NA, n_pp)
     M[1] <- Mspin
 
     if(single_property_cluster){
-      N[,1] <- d
-      M_actual[1] <- d
+      N[,1] <- Mspin
+      M_actual[1] <- Mspin
     } else {
+
+      # distribute based on density
+      d <- Mspin / area * survey_area
+
       N[,1] <- rpois(n_props, d)
       M_actual[1] <- sum(N[,1])
     }
@@ -136,7 +135,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
     # lambda <- rnorm(n_props, alpha, sigma)
     # N[,1] <- round(exp(lambda))
 
-    property_data <- properties[propertyIDs]
+    property_data <- prop_ls[prop_tmp]
 
     e_count <- 0
     take <- tibble()
@@ -176,7 +175,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
             method_lookup = method_lookup,
             alpha_project = project_re[j],
             alpha_cluster = cluster_re[j]) |>
-            mutate(propertyID = propertyIDs[j],
+            mutate(property = prop_tmp[j],
                    property_area_km2 = survey_area[j],
                    cluster_area_km2 = area,
                    cluster = i,
@@ -214,13 +213,14 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
       if(t < n_pp){
         M[t+1] <- process_model(Z, zeta, a_phi, b_phi)
 
-        # distribute based on density
-        d <- M[t+1] / area * survey_area
-
         if(single_property_cluster){
-          N[,t+1] <- d
-          M_actual[t+1] <- d
+          N[,t+1] <- Mspin
+          M_actual[t+1] <- Mspin
         } else {
+
+          # distribute based on density
+          d <- Mspin / area * survey_area
+
           N[,t+1] <- rpois(n_props, d)
           M_actual[t+1] <- sum(N[,t+1])
         }
@@ -247,8 +247,8 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
     colnames(N) <- 1:n_pp
     N_df <- N |>
       as_tibble() |>
-      mutate(propertyID = propertyIDs) |>
-      pivot_longer(cols = -propertyID,
+      mutate(property = prop_tmp) |>
+      pivot_longer(cols = -property,
                    names_to = "PPNum",
                    values_to = "N") |>
       mutate(PPNum = as.numeric(PPNum))
@@ -276,16 +276,16 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, properties){
     filter(cluster %in% good_clusters) |>
     mutate(cluster = as.numeric(as.factor(cluster)),
            project = as.numeric(as.factor(project)),
-           property = as.numeric(as.factor(propertyID))) |>
+           property = as.numeric(as.factor(property))) |>
     arrange(property, PPNum, order)
 
   all_pigs <- all_pigs |>
     filter(!is.na(M),
            cluster %in% good_clusters,
-           propertyID %in% unique(all_take$propertyID)) |>
+           property %in% unique(all_take$property)) |>
     mutate(cluster = as.numeric(as.factor(cluster)),
            project = as.numeric(as.factor(project)),
-           property = as.numeric(as.factor(propertyID))) |>
+           property = as.numeric(as.factor(property))) |>
     arrange(property, PPNum)
 
 
