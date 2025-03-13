@@ -103,7 +103,7 @@ df_with_timesteps <- df |>
   left_join(timestep_df) |>
   filter(year >= StartYr,
          year <= LastYr) |>
-  arrange(propertyID, timestep)
+  arrange(property, timestep)
 
 # need a lookup table for property IDs and how may methods they employ ----
 n_method_lookup <- df_with_timesteps |>
@@ -156,8 +156,7 @@ while(n_method != 5){
     slice(sample.int(nrow(df_with_timesteps), length(properties))) |>
     mutate(property = 1:n(),
            property_area_km2 = list_c(map(properties, "area")),
-           STATE = "CO",
-           propertyID = 1:n())
+           STATE = "CO")
 
   all_clusters <- make_clusters(250, gps_info)
 
@@ -197,13 +196,25 @@ while(n_method != 5){
   simulated_data <- simulate_cluster_dynamics(
     start_density = start_density,
     cluster_props = cluster_props,
-    properties = properties
+    prop_ls = properties
   )
 
   take <- simulated_data$all_take
   abundance <-  simulated_data$all_pigs
 
   n_method <- length(unique(take$method))
+
+}
+
+if(config_name == "default"){
+  library(ggplot2)
+
+  take |>
+    mutate(cluster = as.character(cluster),
+           M = M / cluster_area_km2) |>
+    ggplot() +
+    aes(x = PPNum, y = M, color = cluster) +
+    geom_line()
 
 }
 
@@ -222,8 +233,6 @@ params_check <- c(
   "log_gamma",
   "log_nu",
   "log_rho",
-  "mu_cluster",
-  "mu_project",
   "p_mu",
   "phi_mu",
   "psi_phi",
@@ -289,7 +298,7 @@ cluster_observation_lookup <- take |>
   mutate(observation_flag = 1)
 
 property_observation_lookup <- take |>
-  select(property, propertyID, PPNum) |>
+  select(property, PPNum) |>
   distinct() |>
   mutate(observation_flag = 1)
 
@@ -433,5 +442,4 @@ N_by_time_observed <- N_by_time |> filter(observation_flag == 1)
 round(sum(N_by_time_observed$recovered_flag) / nrow(N_by_time_observed) * 100, 1)
 
 ### start here with parameter recovery
-### TODO ASAP pick property or property ID and stick to one
 
