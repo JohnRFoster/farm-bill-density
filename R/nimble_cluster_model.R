@@ -26,17 +26,13 @@ modelCode <- nimbleCode({
     beta_p[beta_p_row[i], beta_p_col[i]] ~ dnorm(beta_p_mu[i], tau = beta_p_tau[i])
   }
 
-  # mean effects for each cluster and projects
-  mu_project ~ dnorm(0, 1)
-  mu_cluster ~ dnorm(0, 1)
-
   # precision across clusters and projects
   tau_project ~ dgamma(1, 0.01)
   tau_cluster ~ dgamma(1, 0.01)
 
   # project random effect - in data model
   for(i in 1:n_projects){
-    alpha_project[i] ~ dnorm(mu_project, tau_project)
+    alpha_project[i] ~ dnorm(0, tau_project)
   }
 
   # estimate apparent survival
@@ -98,7 +94,7 @@ modelCode <- nimbleCode({
   for(i in 1:n_clusters){
 
     # cluster random effect - in data model
-    alpha_cluster[i] ~ dnorm(mu_cluster, tau_cluster)
+    alpha_cluster[i] ~ dnorm(0, tau_cluster)
 
     log_lambda_1[i] ~ dunif(0, 10)
     log(M[mH[i, 1]]) <- log_lambda_1[i]
