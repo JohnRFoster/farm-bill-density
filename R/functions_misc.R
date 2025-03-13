@@ -8,7 +8,7 @@
 
 #'@description Group properties into spatial clusters given a max area
 #'@param max_area max area that properties are grouped into
-#'@param df data frame with columns propertyID, Project, STATE, FIPS, property_area_km2, Long, Lat
+#'@param df data frame with columns property, Project, STATE, FIPS, property_area_km2, Long, Lat
 
 
 make_clusters <- function(max_area, df){
@@ -49,7 +49,7 @@ make_clusters <- function(max_area, df){
 
     dfc |>
       filter(cluster %in% cc) |>
-      pull(propertyID)
+      pull(property)
 
   }
 
@@ -63,14 +63,14 @@ make_clusters <- function(max_area, df){
   if(length(bad_props) == 0){
     all_clusters <- clusters1
   } else {
-    all_clusters <- clusters1 |> filter(!propertyID %in% bad_props)
+    all_clusters <- clusters1 |> filter(!property %in% bad_props)
 
     dfc <- clusters1
 
     scaler <- seq(0.9, 0, length.out = 20)
     for(s in scaler){
 
-      tmp <- dfc |> filter(propertyID %in% bad_props)
+      tmp <- dfc |> filter(property %in% bad_props)
 
       mc <- dfc |> pull(cluster) |> max()
 
@@ -79,7 +79,7 @@ make_clusters <- function(max_area, df){
         dfc <- create_clusters(tmp, area_threshold, mc)
 
         bad_props <- get_bad_properties(dfc, area_threshold)
-        dfg <- dfc |> filter(!propertyID %in% bad_props)
+        dfg <- dfc |> filter(!property %in% bad_props)
 
         if(nrow(dfg) == 0){
           next
@@ -93,7 +93,7 @@ make_clusters <- function(max_area, df){
       if(s == 0){
         mc <- dfc |> pull(cluster) |> max()
         tmp <- small_properties |>
-          filter(propertyID %in% bad_props)
+          filter(property %in% bad_props)
 
         tmp$cluster <- seq(mc + 1, by = 1, length.out = nrow(tmp))
         tmp$cluster_area_km2 <- tmp$property_area_km2
@@ -118,11 +118,18 @@ make_clusters <- function(max_area, df){
 
   assertthat::are_equal(sum(cluster_size$n_props), length(unique(df$property)))
 
-  cluster_areas <- all_clusters |>
-    select(cluster, cluster_area_km2) |>
-    distinct()
+  cluster_area_1 <- left_join(all_clusters, cluster_size) |>
+    filter(n_props == 1) |>
+    mutate(cluster_area_km2 = property_area_km2)
 
-  check_size <- all_clusters |>
+  cluster_area_n <- left_join(all_clusters, cluster_size) |>
+    filter(n_props > 1)
+
+  cluster_areas <- bind_rows(cluster_area_1, cluster_area_n) |>
+    arrange(property) |>
+    select(-n_props)
+
+  check_size <- cluster_areas |>
     group_by(cluster) |>
     summarise(area = sum(property_area_km2)) |>
     left_join(cluster_areas) |>
@@ -135,7 +142,9 @@ make_clusters <- function(max_area, df){
   bad_clusters <- left_join(cluster_areas, cluster_size) |>
     mutate(drop_flag = if_else(n_props == 1 & cluster_area_km2 < 1.8, 1, 0))
 
-  all_clusters <- left_join(all_clusters, bad_clusters) |>
+  cluster_return <- all_clusters |>
+    select(-cluster_area_km2) |>
+    left_join(bad_clusters) |>
     mutate(cluster = as.numeric(as.factor(cluster))) |>
     group_by(STATE) |>
     mutate(state_cluster = cluster - min(cluster) + 1) |>
@@ -147,7 +156,7 @@ make_clusters <- function(max_area, df){
 
   assertthat::assert_that(all(larger_than_max_area$n_props == 1))
 
-  return(all_clusters)
+  return(cluster_return)
 }
 
 
