@@ -33,8 +33,11 @@ one_method_properties <- function(df, n_properties, n_pp){
   property_attributes <- list(
     num = NULL,
     method_1 = NULL,
-    area = NULL,
-    effort = NULL
+    property_area = NULL,
+    cluster_area = NULL,
+    effort = NULL,
+    cluster = NULL,
+    project = NULL
   )
 
   # initiate list with the number of properties we need ----
@@ -64,25 +67,6 @@ one_method_properties <- function(df, n_properties, n_pp){
                               replace = TRUE)
 
   properties_one <- place_vec(properties_one, n_properties, "method_1", sample_one_method)
-
-  ## function to sample property area from a given set of properties and methods ----
-  get_area <- function(dat, m){
-    dat |>
-      filter(method == m) |>
-      pull(property_area_km2) |>
-      sample(1)
-  }
-
-  one_method_areas <- df |>
-    filter(property %in% one_method_props) |>
-    select(property, method, property_area_km2) |>
-    distinct()
-
-  ## assign areas to 1-method properties ----
-  areas <- sample_one_method |>
-    map_vec(\(x) get_area(one_method_areas, x))
-
-  properties_one <- place_vec(properties_one, n_properties, "area", round(areas, 2))
 
   ## now we need to determine which PPs are sampled for each property ----
   ### start with determining the first PP ----
@@ -139,7 +123,7 @@ one_method_properties <- function(df, n_properties, n_pp){
   }
 
   ### sample the number of observations and reps, place in properties list
-  pb <- txtProgressBar(min = 1, max = n_properties, style = 1)
+  # pb <- propertiesProgressBar(min = 1, max = n_properties, style = 1)
   for(i in seq_len(n_properties)){
     sample_occasions <- get_sample_occasions(one_method_return, sample_one_method[i], start[i], n_pp)
     n_reps <- get_reps(n_reps_single_method, sample_one_method[i], length(sample_occasions))
@@ -152,7 +136,7 @@ one_method_properties <- function(df, n_properties, n_pp){
                      paste("Last PP exceeds boundary for 1-method property", i))
 
     properties_one <- assign_in(properties_one, list(i, "effort"), effort)
-    setTxtProgressBar(pb, i)
+    # setTxtProgressBar(pb, i)
   }
   close(pb)
 

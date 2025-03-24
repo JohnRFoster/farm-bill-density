@@ -40,7 +40,9 @@ n_method_properties <- function(df, n_properties, n, n_pp){
     method_4 = NULL,
     method_5 = NULL,
     area = NULL,
-    effort = NULL
+    effort = NULL,
+    cluster = NULL,
+    project = NULL
   )
   properties_n <- rep(list(property_attributes), n_properties)
 
@@ -91,45 +93,6 @@ n_method_properties <- function(df, n_properties, n, n_pp){
     what <- sample_n_method |> pull(paste0("m_", i))
     properties_n <- place_vec(properties_n, n_properties, where, what)
   }
-
-  ## function to sample property area from a given set of properties and methods ----
-  subset_area_n_method <- function(prop_vec){
-    df |>
-      filter(property %in% prop_vec) |>
-      select(property, method, property_area_km2) |>
-      distinct() |>
-      group_by(property) |>
-      mutate(n = paste0("n_", 1:n())) |>
-      ungroup() |>
-      pivot_wider(names_from = n,
-                  values_from = method)
-  }
-
-  get_area_n <- function(area_df, m){
-
-    area_df |>
-      pivot_longer(cols = starts_with("n_"),
-                   names_to = "n",
-                   values_to = "method") |>
-      group_by(property) |>
-      filter(all(method %in% m)) |>
-      ungroup() |>
-      select(property, property_area_km2) |>
-      distinct() |>
-      pull(property_area_km2) |>
-      sample(1)
-
-  }
-
-  ## assign areas to properties ----
-  n_method_areas <- subset_area_n_method(n_method_props)
-  areas <- 1:n_properties |>
-    map(\(x) get_area_n(n_method_areas,
-                        unname(unlist(slice(sample_n_method, x)))
-    )) |>
-    list_c()
-
-  properties_n <- place_vec(properties_n, n_properties, "area", round(areas, 2))
 
   ## joint and single return intervals ----
   n_return_intervals <- function(prop_vec, n){
@@ -328,7 +291,7 @@ n_method_properties <- function(df, n_properties, n, n_pp){
 
 
   ### sample the number of observations and reps, place in properties list
-  pb <- txtProgressBar(max = n_properties, style = 1)
+  # pb <- txtProgressBar(max = n_properties, style = 1)
   for(i in seq_len(n_properties)){
     m <- unname(unlist(slice(sample_n_method, i)))
 
@@ -348,7 +311,7 @@ n_method_properties <- function(df, n_properties, n, n_pp){
                      paste("Last PP exceeds boundary for 2-method property", i))
 
     properties_n <- assign_in(properties_n, list(i, "effort"), effort)
-    setTxtProgressBar(pb, i)
+    # setTxtProgressBar(pb, i)
   }
   close(pb)
 
