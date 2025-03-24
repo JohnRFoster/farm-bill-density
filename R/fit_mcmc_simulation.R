@@ -38,6 +38,23 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
       calculate = TRUE
     )
 
+    for(i in 1:constants$n_clusters){
+      for(t in 1:constants$n_time_clust[i]){
+        M_model <- Rmodel$M[constants$mH[i, t]]
+        Z <- M_model - constants$rem[i, t]
+
+        if(Z <= 0){
+          message("cluster ", i, "pp ", t)
+          n <- ifelse(Z == 0, 2, Z)
+          Rmodel$M[constants$mH[i, t]] <- M_model + n^2
+        }
+
+      }
+
+      n <- round(M_model - constants$y_sum[i])
+
+    }
+
     # Rmodel$initializeInfo()
     # Rmodel$simulate()
     # Rmodel$calculate()
@@ -64,6 +81,11 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
       mcmcConf$removeSampler(node)
       mcmcConf$addSampler(node, "AF_slice")
     }
+
+    # mcmcConf$addSampler(target = c("alpha_project", "tau_project"), type = "crossLevel")
+    # mcmcConf$addSampler(target = c("alpha_cluster", "tau_cluster"), type = "crossLevel")
+
+    mcmcConf$printSamplers(byType = TRUE)
 
     Rmcmc <- buildMCMC(mcmcConf)
     Cmodel <- compileNimble(Rmodel)
