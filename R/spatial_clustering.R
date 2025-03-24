@@ -42,7 +42,8 @@ all_take <- read_csv(file, show_col_types = FALSE) |>
   mutate(countyfp = sprintf("%03d", countyfp),
          countyfp = ifelse(cnty_name == "HUMBOLDT (E)", "013", countyfp),
          FIPS = as.numeric(paste0(statefp, countyfp)),
-         FIPS = sprintf("%05d", FIPS))
+         FIPS = sprintf("%05d", FIPS)) |>
+  mutate(property = as.numeric(as.factor(propertyID)))
 
 states <- read_csv("../pigs-statistical/data/counties/statePostalCodes.csv")
 postal <- states |>
@@ -75,7 +76,7 @@ write_csv(all_lat_lon, "data/farmBillTakeGoodStates.csv")
 
 # ignoring project for now
 gps_info <- all_lat_lon |>
-  select(Project, propertyID, Project, STATE, FIPS, property_area_km2, Long, Lat) |>
+  select(Project, propertyID, property, Project, STATE, FIPS, property_area_km2, Long, Lat) |>
   distinct()
 
 # =======================
@@ -86,7 +87,9 @@ gps_info <- all_lat_lon |>
 
 all_clusters <- make_clusters(max_area, gps_info)
 
-write_csv(all_clusters, "data/clusters250km2.csv")
+fb_data <- left_join(all_lat_lon, all_clusters)
+
+write_csv(fb_data, "data/clusters250km2.csv")
 
 
 projs <- all_clusters |> pull(Project) |> unique()
@@ -105,7 +108,7 @@ for(i in seq_along(projs)){
 assertthat::are_equal(nrow(all_clusters), nrow(gps_info))
 
 cluster_areas <- all_clusters |>
-  group_by(cluster, state_cluster) |>
+  group_by(cluster) |>
   summarise(cluster_area_km2 = sum(property_area_km2),
             n_props = n()) |>
   ungroup()
@@ -114,33 +117,4 @@ larger_than_max_area <- cluster_areas |>
   filter(cluster_area_km2 > max_area)
 
 assertthat::assert_that(all(larger_than_max_area$n_props == 1))
-
-n_clusters <- length(unique(all_clusters$state_cluster))
-
-n_per_cluster <- all_clusters |>
-  group_by(state_cluster) |>
-  count()
-
-summary(n_per_cluster$n)
-
-n_per_county <- all_clusters |>
-  group_by(FIPS) |>
-  count()
-
-hist(n_per_cluster$n, breaks = 25, main = "Cluster size", xlab = "Number of properties in a cluster")
-
-all_clusters |>
-  select(cluster, STATE) |>
-  distinct() |>
-  group_by(cluster) |>
-  count(STATE) |>
-  filter(n > 1)
-
-all_clusters |>
-  select(cluster, FIPS) |>
-  distinct() |>
-  group_by(cluster) |>
-  count(FIPS) |>
-  filter(n > 1)
-
 
