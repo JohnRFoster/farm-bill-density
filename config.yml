@@ -13,6 +13,10 @@ default:
 hpc_test:
   project_dir: "/lustrefs/ceah/feral-swine/farm-bill"
   posterior_path: "/lustrefs/ceah/feral-swine/property-fits/iterativeFits2/1_posterior"
+  dev_dir: "test"
+  n_pp: 30
+  n_mcmc: 1000
+  n_iter: 100000
 
 hpc_production:
   inherits: hpc_test
