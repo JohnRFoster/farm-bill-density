@@ -1,5 +1,5 @@
 
-simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp){
+simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_project, include_cluster){
 
   library(dplyr)
   library(tidyr)
@@ -67,24 +67,37 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp){
   ) |>
     filter(cluster_area >= 1.8)
 
-  # project and cluster random effects
-  tau_project <- rgamma(1, 1, 1)
-  tau_cluster <- rgamma(1, 1, 1)
-
   n_projects <- length(unique(group_lookup$projects))
   n_clusters <- length(unique(group_lookup$clusters))
+
+  # project and cluster random effects if used
+  if(include_project){
+    tau_project <- rgamma(1, 1, 1)
+    alpha_project <- rnorm(n_projects, 0, prec_2_sd(tau_project))
+  } else {
+    tau_project <- NA
+    alpha_project <- numeric(n_projects)
+  }
 
   project_lookup <- group_lookup |>
     select(projects) |>
     distinct() |>
     mutate(tau_project = tau_project,
-           alpha_project = rnorm(n_projects, 0, 1/sqrt(tau_project)))
+           alpha_project = alpha_project)
+
+  if(include_cluster){
+    tau_cluster <- rgamma(1, 1, 1)
+    alpha_cluster <- rnorm(n_clusters, 0, prec_2_sd(tau_cluster))
+  } else {
+    tau_cluster <- NA
+    alpha_cluster <- numeric(n_clusters)
+  }
 
   cluster_lookup <- group_lookup |>
     select(clusters) |>
     distinct() |>
     mutate(tau_cluster = tau_cluster,
-           alpha_cluster = rnorm(n_clusters, 0, 1/sqrt(tau_cluster)))
+           alpha_cluster = alpha_cluster)
 
   group_lookup <- group_lookup |>
     left_join(project_lookup) |>

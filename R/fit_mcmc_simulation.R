@@ -1,9 +1,13 @@
 fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
-                     n_iter, n_chains, custom_samplers = NULL, monitors_add = NULL){
+                     n_iter, n_chains, custom_samplers = NULL, monitors_add = NULL,
+                     include_project, include_cluster){
 
   require(nimble)
   require(parallel)
   source("R/functions_prep_nimble_simulation.R")
+
+  base <- if_else(!include_project & !include_cluster, TRUE, FALSE)
+  include_project_cluster <- if_else(include_project & include_cluster, TRUE, FALSE)
 
   export <- c(
     "modelCode",
@@ -11,7 +15,11 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
     "constants",
     "n_iter",
     "monitors_add",
-    "custom_samplers"
+    "custom_samplers",
+    "include_project",
+    "include_cluster",
+    "include_project_cluster",
+    "base"
   )
 
   clusterExport(cl, export, envir = environment())

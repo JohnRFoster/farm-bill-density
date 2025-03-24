@@ -8,7 +8,9 @@ default:
   posterior_path: "C:/Users/John.Foster/Downloads/iterativeFits2/1_posterior"
   n_pp: 20
   n_mcmc: 500
-  n_iter: 10000
+  n_iter: 1000
+  include_project: FALSE
+  include_cluster: FALSE
 
 hpc_test:
   project_dir: "/lustrefs/ceah/feral-swine/farm-bill"

@@ -26,13 +26,26 @@ modelCode <- nimbleCode({
     beta_p[beta_p_row[i], beta_p_col[i]] ~ dnorm(beta_p_mu[i], tau = beta_p_tau[i])
   }
 
-  # precision across clusters and projects
-  tau_project ~ dgamma(1, 1)
-  tau_cluster ~ dgamma(1, 1)
-
   # project random effect - in data model
-  for(i in 1:n_projects){
-    alpha_project[i] ~ dnorm(0, tau = tau_project)
+  if(include_project){
+
+    tau_project ~ dgamma(1, 1)
+
+    for(i in 1:n_projects){
+      alpha_project[i] ~ dnorm(0, tau = tau_project)
+    }
+
+  }
+
+  # cluster random effect - in data model
+  if(include_cluster){
+
+    tau_cluster ~ dgamma(1, 1)
+
+    for(i in 1:n_clusters){
+      alpha_cluster[i] ~ dnorm(0, tau = tau_cluster)
+    }
+
   }
 
   # estimate apparent survival
@@ -64,13 +77,35 @@ modelCode <- nimbleCode({
       method = method[i]
     )
 
-    # probability of capture, given that an individual is in the surveyed area
+    # base probability of capture,
+    if(base){
+      logit(theta[i]) <- beta1[method[i]] +
+        inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p])
+    }
 
-    logit(theta[i]) <- beta1[method[i]] +
-      inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p]) +
-      alpha_project[project[i]] +
-      alpha_cluster[cluster[i]]
+    # base + project random effect
+    if(include_project){
+      logit(theta[i]) <- beta1[method[i]] +
+        inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p]) +
+        alpha_project[project[i]]
+    }
 
+    # base + cluster random effect
+    if(include_cluster){
+      logit(theta[i]) <- beta1[method[i]] +
+        inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p]) +
+        alpha_cluster[cluster[i]]
+    }
+
+    # base + project + cluster random effects
+    if(include_project_cluster){
+      logit(theta[i]) <- beta1[method[i]] +
+        inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p]) +
+        alpha_project[project[i]] +
+        alpha_cluster[cluster[i]]
+    }
+
+    # capture given that an individual is in the surveyed area
     log_theta[i] <- log(theta[i]) + min(0, log_potential_area[i] - log_survey_area_km2[i])
 
     # likelihood
@@ -90,9 +125,6 @@ modelCode <- nimbleCode({
   }
 
   for(i in 1:n_clusters){
-
-    # cluster random effect - in data model
-    alpha_cluster[i] ~ dnorm(0, tau = tau_cluster)
 
     log_lambda_1[i] ~ dunif(0, 10)
     log(M[mH[i, 1]]) <- log_lambda_1[i]

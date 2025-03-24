@@ -39,7 +39,13 @@ if(grepl("hpc", config_name)){
 }
 
 message("Task ID: ", task_id)
+set.seed(task_id)
 
+include_project <- config$include_project
+include_cluster <- config$include_cluster
+
+message("Project random effect: ", include_project)
+message("Cluster random effect: ", include_cluster)
 
 library(nimble)
 library(parallel)
@@ -175,7 +181,9 @@ while(n_method != 5){
   simulated_data <- simulate_cluster_dynamics(
     start_density = start_density,
     prop_ls = properties,
-    n_pp = config$n_pp
+    n_pp = config$n_pp,
+    include_project,
+    include_cluster
   )
 
   take <- simulated_data$all_take
@@ -214,7 +222,7 @@ nimble_ls <- prep_nimble(take, config$posterior_path) |> suppressMessages()
 nimble_data <- nimble_ls$data
 nimble_constants <- nimble_ls$constants
 
-monitors_add <- c("N", "M", "alpha_cluster", "alpha_project")
+monitors_add <- c("N", "M")
 
 params_check <- c(
   "alpha_cluster",
@@ -226,10 +234,18 @@ params_check <- c(
   "log_rho",
   "p_mu",
   "phi_mu",
-  "psi_phi",
-  "tau_cluster",
-  "tau_project"
+  "psi_phi"
 )
+
+if(include_project){
+  monitors_add <- c(monitors_add, "alpha_project")
+  params_check <- c(params_check, "tau_project")
+}
+
+if(include_cluster){
+  monitors_add <- c(monitors_add, "alpha_cluster")
+  params_check <- c(params_check, "tau_cluster")
+}
 
 n_chains <- config$n_chains
 cl <- makeCluster(n_chains)
@@ -249,13 +265,20 @@ samples <- fit_mcmc(
   n_iter = config$n_iter,
   n_chains = n_chains,
   custom_samplers = c_samp,
-  monitors_add = monitors_add
+  monitors_add = monitors_add,
+  include_project = include_project,
+  include_cluster = include_cluster
 )
 
 stopCluster(cl)
 
+if(include_project){
+  model_dir <- if_else(include_cluster, "project_cluster", "project")
+} else {
+  model_dir <- if_else(include_cluster, "cluster", "base")
+}
 
-out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, task_id)
+out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, model_dir, task_id)
 message("\n\nWriting to: ", out_dir)
 
 if(!dir.exists(out_dir)) dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
