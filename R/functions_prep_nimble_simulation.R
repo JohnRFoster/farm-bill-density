@@ -297,22 +297,22 @@ prep_nimble <- function(take, posterior_path){
     m_p = ncol(X),
     method = as.numeric(as.factor(take$method)),
     pp_len = 28,
-    phi_mu_a = alpha,
-    phi_mu_b = beta,
-    log_rho_mu = log_rho$mu,
-    log_rho_tau = log_rho$tau,
-    p_mu_mu = p_mu$mu,
-    p_mu_tau = p_mu$tau,
-    log_gamma_mu = log_gamma$mu,
-    log_gamma_tau = log_gamma$tau,
-    beta1_mu = beta1$mu,
-    beta1_tau = beta1$tau,
-    beta_p_mu = beta_p$mu,
-    beta_p_tau = beta_p$tau,
-    psi_shape = shape,
-    psi_rate = rate,
-    log_nu_mu = log_nu$mu,
-    log_nu_tau = log_nu$tau,
+    log_rho_mu = rep(0, 5),
+    log_rho_tau = rep(3, 5),
+    p_mu_mu = rep(0, 2),
+    p_mu_tau = rep(1, 2),
+    log_gamma_mu = rep(0, 2),
+    log_gamma_tau = rep(3, 2),
+    beta1_mu = rep(0, 5),
+    beta1_tau = rep(1, 5),
+    beta_p_mu = rep(0, 15),
+    beta_p_tau = rep(1, 15),
+    phi_mu_a = 1,
+    phi_mu_b = 1,
+    psi_shape = 1,
+    psi_rate = 0.1,
+    log_nu_mu = 2,
+    log_nu_tau = 1,
     n_betaP = n_method * ncol(X),
     beta_p_row = rep(1:n_method, each = ncol(X)),
     beta_p_col = rep(1:ncol(X), n_method)
@@ -349,8 +349,7 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     params |>
       select(contains(x)) |>
       pivot_longer(cols = everything()) |>
-      pull(value) |>
-      jitter()
+      pull(value)
 
   }
 
@@ -377,7 +376,10 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     # i=1
     for(i in 1:n_clusters){
 
-      M_init[i] <- round(exp(log_cluster_area[i])*start_density + sum(rem[i, ], na.rm = TRUE))
+      ca <- exp(log_cluster_area[i])
+      if(is.na(ca)) ca <- exp(sample(log_cluster_area, 1))
+
+      M_init[i] <- round(ca*start_density + 2*sum(rem[i, ], na.rm = TRUE))
       M[mH[i, 1]] <- M_init[i]
       # j=2
       for(j in 2:n_time_clust[i]){
@@ -387,6 +389,8 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
         z <- max(1, z)
 
         lambda[mH[i, j-1]] <- z * zeta / 2 + z * phi[mH[i, j-1]]
+
+        assertthat::assert_that(lambda[mH[i, j-1]] >= 0)
 
         M[mH[i, j]] <- rpois(1, lambda[mH[i, j-1]])
         # if(is.na(M[mH[i, j]])) print(j); print(M[mH[i, j]])
@@ -433,10 +437,8 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       phi = phi,
       zeta = zeta,
       log_zeta = log(zeta),
-      mu_project = rnorm(1, 0, 0.01),
-      mu_cluster = rnorm(1, 0, 0.01),
-      tau_project = runif(1, 1, 5),
-      tau_cluster = runif(1, 1, 5),
+      tau_project = runif(1, 1e-04, 1),
+      tau_cluster = runif(1, 1e-04, 1),
       alpha_project = rnorm(n_projects, 0, 1),
       alpha_cluster = rnorm(n_clusters, 0, 1)
     )
