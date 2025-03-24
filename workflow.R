@@ -21,7 +21,9 @@
 #
 # --------------------------------------------------------------------
 
-config_name <- "hpc_production"
+# config_name <- "default"
+config_name <- "hpc_test"
+# config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
@@ -49,6 +51,7 @@ library(purrr)
 library(lubridate)
 
 source("R/functions_misc.R")
+source("R/make_properites.R")
 source("R/functions_prep_nimble_simulation.R")
 source("R/simulation.R")
 source("R/fit_mcmc_simulation.R")
@@ -61,7 +64,8 @@ source("R/one_method_properties.R")
 # Load MIS data ----
 # -----------------------------------------------------------------
 message("MIS data intake")
-df <- read_csv("data/farmBillTakeGoodStates.csv") |>
+df <- read_csv("data/clusters250km2.csv") |>
+  filter(STATE == "OK") |>
   mutate(property = as.numeric(as.factor(propertyID)))
 
 end_dates <- unique(sort(df$end.date))
@@ -105,98 +109,73 @@ df_with_timesteps <- df |>
          year <= LastYr) |>
   arrange(property, timestep)
 
-# need a lookup table for property IDs and how may methods they employ ----
-n_method_lookup <- df_with_timesteps |>
-  select(property, method) |>
+# need a lookup table for the number of properties in each cluster ----
+n_property_lookup <- df_with_timesteps |>
+  select(property, cluster) |>
   distinct() |>
-  count(property)
+  count(cluster, name = "n_props_in_cluster")
 
-# get the proportion of properties that use n methods
-# for determining the number of properties to simulate
-n_rel <- n_method_lookup |>
-  count(n, name = "n_sum") |>
-  mutate(rel_prop = n_sum / sum(n_sum),
-         n_simulate = ceiling(rel_prop * 200))
+# get the proportion of clusters that have n properties
+# for determining the number of clusters to simulate
+n_rel <- n_property_lookup |>
+  count(n_props_in_cluster, name = "n_clusters") |>
+  mutate(rel_prop = n_clusters / sum(n_clusters),
+         n_clusters_to_sim = ceiling(rel_prop * 40),
+         n_props_to_sim = n_clusters_to_sim * n_props_in_cluster)
 
-# -----------------------------------------------------------------
-# 1-method properties ----
-# -----------------------------------------------------------------
-message("Create 1-method properties")
-n_pp <- config$n_pp       # the number of primary periods to simulate
-method_1 <- one_method_properties(df_with_timesteps, n_rel$n_simulate[1], n_pp)
-
-# -----------------------------------------------------------------
-# n-method properties ----
-# -----------------------------------------------------------------
-
+n_clusters_to_sim <- sum(n_rel$n_clusters_to_sim)
+n_properties_to_sim <- sum(n_rel$n_props_to_sim)
+n_props_in_cluster <- n_rel$n_props_in_cluster
 
 start_density <- round(runif(1, 0.3, 5), 3)
 message("Starting density: ", start_density)
+message("n clusters: ", n_clusters_to_sim)
+message("n properties: ", n_properties_to_sim)
+
+cluster_breaks <- c(0, cumsum(n_rel$n_clusters_to_sim))
+property_breaks <- c(0, cumsum(n_rel$n_props_to_sim))
+
+all_clusters <- tibble()
+for(i in 1:(length(cluster_breaks) - 1)){
+
+  clust <- tibble(
+    cluster = rep((cluster_breaks[i] + 1):(cluster_breaks[i + 1]),
+                  each = n_props_in_cluster[i]),
+    property = (property_breaks[i] + 1):(property_breaks[i + 1]),
+  )
+
+  all_clusters <- bind_rows(all_clusters, clust)
+
+}
 
 n_method <- 0
 while(n_method != 5){
 
-  message("Create 2-method properties")
-  method_2 <- n_method_properties(df_with_timesteps, n_rel$n_simulate[2], 2, n_pp)
-  message("Create 3-method properties")
-  method_3 <- n_method_properties(df_with_timesteps, n_rel$n_simulate[3], 3, n_pp)
-  message("Create 4-method properties")
-  method_4 <- n_method_properties(df_with_timesteps, n_rel$n_simulate[4], 4, n_pp)
+  properties <- list()
 
-  properties <- c(
-    method_1,
-    method_2,
-    method_3,
-    method_4
-  )
+  for(i in 1:nrow(n_rel)){
 
-  # randomly assign each property a Lat Lon
-  gps_info <- df_with_timesteps |>
-    select(Lat, Long) |>
-    slice(sample.int(nrow(df_with_timesteps), length(properties))) |>
-    mutate(property = 1:n(),
-           property_area_km2 = list_c(map(properties, "area")),
-           STATE = "CO")
+    properties_i <- make_properites(
+      df = df_with_timesteps,
+      n_clusters = n_rel$n_clusters_to_sim[i],
+      n_props_in_each_cluster = n_props_in_cluster[i],
+      n_pp = config$n_pp)
 
-  all_clusters <- make_clusters(250, gps_info)
+    cluster_vec <- rep((cluster_breaks[i] + 1):(cluster_breaks[i + 1]),
+                       each = n_props_in_cluster[i])
 
-  # assign projects
-  clusters <- unique(all_clusters$cluster)
-  n_clusters <- length(unique(all_clusters$state_cluster))
+    properties_i <- properties_i |> map2(1:length(properties_i),
+                                         \(x, y) assign_in(x, "cluster", cluster_vec[y]))
 
-  # each project gets multiple clusters
-  # at least two clusters per project
-  project_vec <- 1
-  i <- 1
-  while(length(project_vec) < n_clusters){
-    nc <- round(runif(1, 1.5, 14.4))
-    tmp <- rep(i, nc)
-    project_vec <- c(project_vec, tmp)
-    i <- i + 1
+    properties <- c(properties, properties_i)
+
   }
-
-  project_vec <- project_vec[1:n_clusters]
-
-  n_per_cluster <- all_clusters |>
-    group_by(state_cluster) |>
-    count()
-
-  summary(n_per_cluster$n)
-  hist(n_per_cluster$n, breaks = 20)
-
-  project_lookup <- tibble(
-    cluster = clusters,
-    project = project_vec
-  )
-
-  cluster_props <- all_clusters |>
-    left_join(project_lookup)
 
   message("\nSimulate cluster dynamics")
   simulated_data <- simulate_cluster_dynamics(
     start_density = start_density,
-    cluster_props = cluster_props,
-    prop_ls = properties
+    prop_ls = properties,
+    n_pp = config$n_pp
   )
 
   take <- simulated_data$all_take
@@ -214,9 +193,21 @@ if(config_name == "default"){
            M = M / cluster_area_km2) |>
     ggplot() +
     aes(x = PPNum, y = M, color = cluster) +
+    labs(y = "density") +
     geom_line()
 
 }
+
+take |>
+  select(property, cluster) |>
+  distinct() |>
+  count(cluster, name = "n_properties_in_cluster") |>
+  count(n_properties_in_cluster)
+
+take |>
+  select(project, cluster) |>
+  distinct() |>
+  arrange(project, cluster)
 
 message("Prep data for MCMC")
 nimble_ls <- prep_nimble(take, config$posterior_path) |> suppressMessages()
@@ -255,14 +246,14 @@ samples <- fit_mcmc(
   data = nimble_ls$data,
   constants = nimble_ls$constants,
   start_density = start_density,
-  n_iter = 100000,
-  # n_iter = config$n_iter,
+  n_iter = config$n_iter,
   n_chains = n_chains,
   custom_samplers = c_samp,
   monitors_add = monitors_add
 )
 
 stopCluster(cl)
+
 
 out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, task_id)
 message("\n\nWriting to: ", out_dir)
@@ -277,20 +268,29 @@ out <- check_mcmc(
   dest = out_dir
 )
 
-source("R/functions_misc.R")
 all_time_ids <- make_all_pp(take)
 known_abundance <- left_join(all_time_ids, abundance) |>
+  # filter(!is.na(M)) |>
   mutate(propertySimID = paste(task_id, property, start_density, sep = "-"),
-         clustersimID = paste(task_id, cluster, start_density, sep = "-"))
+         clusterSimID = paste(task_id, cluster, start_density, sep = "-"),
+         projectSimID = paste(task_id, project, start_density, sep = "-"))
 
-out$known_abundance <- known_abundance
+add_ids <- function(df){
+  df |>
+    mutate(task_id = task_id,
+           start_density = start_density)
+}
+
+out$known_abundance <- known_abundance |> add_ids()
 out$data <- nimble_ls$data
 out$constants <- nimble_ls$constants
 out$start_density <- start_density
 out$task_id <- task_id
 out$take <- take |>
   mutate(propertySimID = paste(task_id, property, start_density, sep = "-"),
-         clusterSimID = paste(task_id, cluster, start_density, sep = "-"))
+         clusterSimID = paste(task_id, cluster, start_density, sep = "-"),
+         projectSimID = paste(task_id, project, start_density, sep = "-")) |>
+  add_ids()
 
 cluster_observation_lookup <- take |>
   select(cluster, PPNum) |>
@@ -315,30 +315,33 @@ select_pivot_longer <- function(df, node){
 samples_matrix <- out$posterior_samples
 out$posterior_samples <- NULL
 
+node_pattern <- "(?<=\\[)\\d*"
+
 M_samples <- samples_matrix |>
   select_pivot_longer("M[") |>
-  mutate(m_id = as.numeric(stringr::str_extract(node, "(?<=\\[)\\d*")))
+  mutate(m_id = as.numeric(stringr::str_extract(node, node_pattern)))
 
 message("Writing cluster abundance samples")
 write_rds(M_samples, file.path(out_dir, "clusterAbundanceSamples.rds"))
 
 N_samples <- samples_matrix |>
   select_pivot_longer("N[") |>
-  mutate(n_id = as.numeric(stringr::str_extract(node, "(?<=\\[)\\d*")))
+  mutate(n_id = as.numeric(stringr::str_extract(node, node_pattern)))
 
 message("Writing property abundance samples")
 write_rds(N_samples, file.path(out_dir, "propertyAbundanceSamples.rds"))
 
+
 M_known <- known_abundance |>
   left_join(cluster_observation_lookup) |>
   mutate(observation_flag = if_else(is.na(observation_flag), 0, observation_flag)) |>
-  select(m_id, M, clustersimID, cluster, PPNum, observation_flag) |>
+  select(m_id, M, clusterSimID, cluster, PPNum, observation_flag) |>
   distinct()
 
 N_known <- known_abundance |>
   left_join(property_observation_lookup) |>
   mutate(observation_flag = if_else(is.na(observation_flag), 0, observation_flag)) |>
-  select(n_id, N, M, property, propertySimID, clustersimID, cluster, PPNum, observation_flag) |>
+  select(n_id, N, M, property, propertySimID, clusterSimID, cluster, PPNum, observation_flag) |>
   distinct()
 
 cluster_areas <- take |>
@@ -349,7 +352,7 @@ property_areas <- take |>
   select(cluster, property, cluster_area_km2, property_area_km2) |>
   distinct()
 
-M_join <- left_join(M_samples, M_known) |>
+M_join <- left_join(M_samples, M_known, by = "m_id") |>
   left_join(cluster_areas) |>
   mutate(estimated_density = value / cluster_area_km2,
          known_mean_density = M / cluster_area_km2,
@@ -375,32 +378,33 @@ m_summary <- function(df){
       norm_rmse = rmse /  mean(known_mean_density)
     ) |>
     ungroup() |>
-    mutate(recovered_flag = if_else(med_known >= low & med_known <= high, 1, 0))
+    mutate(recovered_flag = if_else(med_known >= low & med_known <= high, 1, 0)) |>
+    add_ids()
 }
 
 # M each cluster x primary period
 M_by_time <- M_join |>
-  group_by(cluster, clustersimID, PPNum, M, known_mean_density, observation_flag) |>
+  group_by(cluster, clusterSimID, PPNum, M, known_mean_density, observation_flag) |>
   m_summary()
 
 # M each cluster
 M_by_cluster <- M_join |>
-  group_by(cluster, clustersimID) |>
+  group_by(cluster, clusterSimID) |>
   m_summary()
 
 # N each property x primary period
 N_by_time <- N_join |>
-  group_by(property, propertySimID, clustersimID, PPNum, N, observation_flag) |>
+  group_by(property, propertySimID, clusterSimID, PPNum, N, observation_flag) |>
   m_summary()
 
 # N each property
 N_by_property <- N_join |>
-  group_by(property, clustersimID) |>
+  group_by(property, clusterSimID) |>
   m_summary()
 
 # N across clusters
 N_by_cluster <- N_join |>
-  group_by(clustersimID) |>
+  group_by(clusterSimID) |>
   m_summary()
 
 out$M_by_time <- M_by_time
@@ -408,9 +412,6 @@ out$M_by_cluster <- M_by_cluster
 out$N_by_time <- N_by_time
 out$N_by_property <- N_by_property
 out$N_by_cluster <- N_by_cluster
-
-out <- purrr::compact(out)
-write_rds(out, file.path(out_dir, "simulationData.rds"))
 
 message("\nCorrelation: Cluster densities for each primary period")
 round(cor(M_by_time$med_known, M_by_time$med), 2)
@@ -442,4 +443,58 @@ N_by_time_observed <- N_by_time |> filter(observation_flag == 1)
 round(sum(N_by_time_observed$recovered_flag) / nrow(N_by_time_observed) * 100, 1)
 
 ### start here with parameter recovery
+
+known_params <- read_csv("data/posterior_95CI_range_all.csv") |>
+  suppressMessages() |>
+  select(node, med) |>
+  rename(actual = med)
+
+alpha_cluster <- take |>
+  select(cluster, alpha_cluster) |>
+  distinct() |>
+  mutate(node = paste0("alpha_cluster[", cluster, "]")) |>
+  rename(actual = alpha_cluster) |>
+  select(node, actual)
+
+alpha_project <- take |>
+  select(project, alpha_project) |>
+  distinct() |>
+  mutate(node = paste0("alpha_project[", project, "]")) |>
+  rename(actual = alpha_project) |>
+  select(node, actual)
+
+tau_cluster <- take |>
+  select(tau_cluster) |>
+  distinct() |>
+  mutate(node = "tau_cluster") |>
+  rename(actual = tau_cluster) |>
+  select(node, actual)
+
+tau_project <- take |>
+  select(tau_project) |>
+  distinct() |>
+  mutate(node = "tau_project") |>
+  rename(actual = tau_project) |>
+  select(node, actual)
+
+params_actual <- bind_rows(
+  known_params,
+  alpha_cluster,
+  alpha_project,
+  tau_cluster,
+  tau_project
+) |>
+  add_ids()
+
+out$params_actual <- params_actual
+out <- purrr::compact(out)
+write_rds(out, file.path(out_dir, "simulationData.rds"))
+
+
+
+
+
+
+
+
 
