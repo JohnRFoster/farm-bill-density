@@ -1,5 +1,5 @@
 
-simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
+simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp){
 
   library(dplyr)
   library(tidyr)
@@ -50,57 +50,64 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
   # there can be up to m0 primary periods after all pigs are gone before we drop data
   m0 <- 6
 
-  projects <- unique(cluster_props$project)
-  clusters <- unique(cluster_props$cluster)
+  get_attribute <- function(ls, name){
+    1:length(ls) |>
+      map(
+        \(x) pluck(ls[[x]], name)
+      ) |>
+      list_c()
+  }
 
-  n_projects <- length(projects)
-  n_clusters <- length(clusters)
+  group_lookup <- tibble(
+    property = 1:length(prop_ls),
+    projects = get_attribute(prop_ls, "project"),
+    clusters = get_attribute(prop_ls, "cluster"),
+    property_area = get_attribute(prop_ls, "property_area"),
+    cluster_area = get_attribute(prop_ls, "cluster_area")
+  ) |>
+    filter(cluster_area >= 1.8)
 
   # project and cluster random effects
-  tau_project <- runif(1, 1e-4, 100)
-  tau_cluster <- runif(1, 1e-4, 100)
+  tau_project <- rgamma(1, 1, 1)
+  tau_cluster <- rgamma(1, 1, 1)
 
-  project_lookup <- tibble(
-    project = projects,
-    tau_project = tau_project,
-    alpha_project = rnorm(n_projects, 0, 1/sqrt(tau_project))
-  )
+  n_projects <- length(unique(group_lookup$projects))
+  n_clusters <- length(unique(group_lookup$clusters))
 
-  cluster_lookup <- tibble(
-    cluster = clusters,
-    tau_cluster = tau_cluster,
-    alpha_cluster = rnorm(n_clusters, 0, 1/sqrt(tau_cluster))
-  )
-
-  group_lookup <- cluster_props |>
-    select(property, project, cluster) |>
+  project_lookup <- group_lookup |>
+    select(projects) |>
     distinct() |>
+    mutate(tau_project = tau_project,
+           alpha_project = rnorm(n_projects, 0, 1/sqrt(tau_project)))
+
+  cluster_lookup <- group_lookup |>
+    select(clusters) |>
+    distinct() |>
+    mutate(tau_cluster = tau_cluster,
+           alpha_cluster = rnorm(n_clusters, 0, 1/sqrt(tau_cluster)))
+
+  group_lookup <- group_lookup |>
     left_join(project_lookup) |>
     left_join(cluster_lookup)
 
-  all_take <- all_pigs <- tibble()
+  all_take <- all_pigs <- known_abundance <- tibble()
+  cluster_vec <- unique(group_lookup$clusters)
 
   pb <- txtProgressBar(max = n_clusters, style = 1)
   for(i in seq_len(n_clusters)){
 
-    prop_tmp_in_cluster <- cluster_props |>
-      filter(cluster == clusters[i])
+    prop_tmp_in_cluster <- group_lookup |>
+      filter(clusters %in% cluster_vec[i])
 
-    if(prop_tmp_in_cluster$drop_flag[1] == 1) next
-
-    area <- prop_tmp_in_cluster$cluster_area_km2[1]
+    area <- prop_tmp_in_cluster$cluster_area[1]
     prop_tmp <- prop_tmp_in_cluster$property
-    survey_area <- prop_tmp_in_cluster$property_area_km2
-    project <- prop_tmp_in_cluster$project
-
-    cp_group <- group_lookup |> filter(property %in% prop_tmp)
-
-    project_re <- cp_group$alpha_project
-    cluster_re <- cp_group$alpha_cluster
-
+    survey_area <- prop_tmp_in_cluster$property_area
     log_survey_area <- log(survey_area)
+    project <- prop_tmp_in_cluster$projects
+    project_re <- prop_tmp_in_cluster$alpha_project
+    cluster_re <- prop_tmp_in_cluster$alpha_cluster
 
-    n_props <- length(survey_area)
+    n_props <- length(prop_tmp)
     X <- matrix(rnorm(3 * n_props), n_props, 3)
 
     single_property_cluster <- if_else(n_props == 1, TRUE, FALSE)
@@ -139,6 +146,20 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
 
     e_count <- 0
     take <- tibble()
+
+    tka <- tibble(
+      project = project,
+      cluster = cluster_vec[i],
+      cluster_area_km2 = area,
+      property = prop_tmp,
+      property_area_km2 = survey_area,
+      M = M[1],
+      N = N[,1],
+      PPNum = 1
+    )
+
+    known_abundance <- bind_rows(known_abundance, tka)
+
     for(t in 1:(n_pp-1)){
 
       # reset catch
@@ -178,7 +199,7 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
             mutate(property = prop_tmp[j],
                    property_area_km2 = survey_area[j],
                    cluster_area_km2 = area,
-                   cluster = i,
+                   cluster = cluster_vec[i],
                    project = project[j],
                    N = nn,
                    M = M[t],
@@ -199,12 +220,12 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
           assertthat::assert_that(zi >= 0,
                                   msg = paste("More pigs removed than are alive!", identifier))
 
-        }
+        } # remove pigs loop
 
-      }
+      } # property loop
 
       # need to use the realized cluster size in case all pigs are removed
-      Z <- M_actual[t] - sum(Y)
+      Z <- M[t] - sum(Y)
 
       identifier <- paste0("\nCluster ", i, "\nTime ", t)
       assertthat::assert_that(Z >= 0,
@@ -214,53 +235,47 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
         M[t+1] <- process_model(Z, zeta, a_phi, b_phi)
 
         if(single_property_cluster){
-          N[,t+1] <- Mspin
-          M_actual[t+1] <- Mspin
+          N[,t+1] <- M[t+1]
+          M_actual[t+1] <- M[t+1]
         } else {
 
           # distribute based on density
-          d <- Mspin / area * survey_area
+          d <- M[t+1] / area * survey_area
 
           N[,t+1] <- rpois(n_props, d)
           M_actual[t+1] <- sum(N[,t+1])
         }
 
-        # alpha <- log(d)
+        tka <- tibble(
+          project = project,
+          cluster = cluster_vec[i],
+          cluster_area_km2 = area,
+          property = prop_tmp,
+          property_area_km2 = survey_area,
+          M = M[t+1],
+          N = N[,t+1],
+          PPNum = t+1
+        )
+
+        known_abundance <- bind_rows(known_abundance, tka)
+
+         # alpha <- log(d)
         # lambda <- rnorm(n_props, alpha, sigma)
         # N[,t] <- round(exp(lambda))
 
-        e_count <- if_else(M_actual[t+1] == 0, e_count + 1, e_count)
+        e_count <- if_else(M[t+1] == 0, e_count + 1, e_count)
         if(e_count >= m0) break
 
       }
 
 
-    }
+    } # time loop
 
-    M_df <- tibble(
-      M = M,
-      M_actual = M_actual,
-      PPNum = 1:n_pp,
-      cluster = i
-    )
-
-    colnames(N) <- 1:n_pp
-    N_df <- N |>
-      as_tibble() |>
-      mutate(property = prop_tmp) |>
-      pivot_longer(cols = -property,
-                   names_to = "PPNum",
-                   values_to = "N") |>
-      mutate(PPNum = as.numeric(PPNum))
-
-    pigs_i <- left_join(M_df, N_df) |> suppressMessages()
-
-    all_pigs <- bind_rows(all_pigs, pigs_i)
     all_take <- bind_rows(all_take, take)
 
     setTxtProgressBar(pb, i)
 
-  }
+  } # cluster loop
   close(pb)
 
   good_clusters <- all_take |>
@@ -273,25 +288,56 @@ simulate_cluster_dynamics <- function(start_density, cluster_props, prop_ls){
     unique()
 
   all_take <- left_join(all_take, group_lookup) |>
+    select(-projects, -clusters) |>
     filter(cluster %in% good_clusters) |>
-    mutate(cluster = as.numeric(as.factor(cluster)),
-           project = as.numeric(as.factor(project)),
-           property = as.numeric(as.factor(property))) |>
     arrange(property, PPNum, order)
 
-  all_pigs <- all_pigs |>
+  all_pigs <- known_abundance |>
     filter(!is.na(M),
            cluster %in% good_clusters,
            property %in% unique(all_take$property)) |>
-    mutate(cluster = as.numeric(as.factor(cluster)),
-           project = as.numeric(as.factor(project)),
-           property = as.numeric(as.factor(property))) |>
     arrange(property, PPNum)
+
+  take_check <- all_take |>
+    select(project, cluster, property) |>
+    distinct()
+
+  pigs_check <- all_pigs |>
+    select(project, cluster, property) |>
+    distinct()
+
+  assertthat::assert_that(nrow(take_check) == nrow(pigs_check))
+
+  assertthat::assert_that(all(take_check$project == pigs_check$project),
+                          msg = "projects do not align")
+
+  assertthat::assert_that(all(take_check$cluster == pigs_check$cluster),
+                          msg = "clusters do not align")
+
+  assertthat::assert_that(all(take_check$property == pigs_check$property),
+                          msg = "properties do not align")
+
+  group_fac <- take_check |>
+    mutate(cluster_fac = as.numeric(as.factor(cluster)),
+           project_fac = as.numeric(as.factor(project)),
+           property_fac = as.numeric(as.factor(property)))
+
+  take_return <- left_join(all_take, group_fac) |>
+    select(-cluster, -project, -property) |>
+    rename(cluster = cluster_fac,
+           project = project_fac,
+           property = property_fac)
+
+  pigs_return <- left_join(all_pigs, group_fac) |>
+    select(-cluster, -project, -property) |>
+    rename(cluster = cluster_fac,
+           project = project_fac,
+           property = property_fac)
 
 
   return(list(
-    all_pigs = all_pigs,
-    all_take = all_take
+    all_pigs = pigs_return,
+    all_take = take_return
   ))
 }
 
