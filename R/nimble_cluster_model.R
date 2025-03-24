@@ -27,12 +27,12 @@ modelCode <- nimbleCode({
   }
 
   # precision across clusters and projects
-  tau_project ~ dgamma(1, 0.01)
-  tau_cluster ~ dgamma(1, 0.01)
+  tau_project ~ dgamma(1, 1)
+  tau_cluster ~ dgamma(1, 1)
 
   # project random effect - in data model
   for(i in 1:n_projects){
-    alpha_project[i] ~ dnorm(0, tau_project)
+    alpha_project[i] ~ dnorm(0, tau = tau_project)
   }
 
   # estimate apparent survival
@@ -65,15 +65,13 @@ modelCode <- nimbleCode({
     )
 
     # probability of capture, given that an individual is in the surveyed area
-    log_theta[i] <- log(
-                      ilogit(
-                        beta1[method[i]] +
-                          inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p]) +
-                          alpha_project[project[i]] +
-                          alpha_cluster[cluster[i]]
-                      )
-                    ) +
-      min(0, log_potential_area[i] - log_survey_area_km2[i])
+
+    logit(theta[i]) <- beta1[method[i]] +
+      inprod(X_p[i, 1:m_p], beta_p[method[i], 1:m_p]) +
+      alpha_project[project[i]] +
+      alpha_cluster[cluster[i]]
+
+    log_theta[i] <- log(theta[i]) + min(0, log_potential_area[i] - log_survey_area_km2[i])
 
     # likelihood
     y[i] ~ dpois(p[i] * (N[nH_p[i]] - y_sum[i]))
@@ -94,7 +92,7 @@ modelCode <- nimbleCode({
   for(i in 1:n_clusters){
 
     # cluster random effect - in data model
-    alpha_cluster[i] ~ dnorm(0, tau_cluster)
+    alpha_cluster[i] ~ dnorm(0, tau = tau_cluster)
 
     log_lambda_1[i] ~ dunif(0, 10)
     log(M[mH[i, 1]]) <- log_lambda_1[i]
