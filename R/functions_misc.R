@@ -103,20 +103,21 @@ make_clusters <- function(max_area, df){
       }
 
     }
-
-    mc <- all_clusters |> pull(cluster) |> max()
-    large_properties$cluster <- seq(mc + 1, by = 1, length.out = nrow(large_properties))
-    large_properties$cluster_area_km2 <- large_properties$property_area_km2
-
-    all_clusters <- bind_rows(all_clusters, large_properties)
   }
+
+  mc <- all_clusters |> pull(cluster) |> max()
+  large_properties$cluster <- seq(mc + 1, by = 1, length.out = nrow(large_properties))
+  large_properties$cluster_area_km2 <- large_properties$property_area_km2
+
+  all_clusters <- bind_rows(all_clusters, large_properties)
 
   cluster_size <- all_clusters |>
     group_by(cluster) |>
     summarise(n_props = n()) |>
     ungroup()
 
-  assertthat::are_equal(sum(cluster_size$n_props), length(unique(df$property)))
+  assertthat::assert_that(sum(cluster_size$n_props) == length(unique(df$property)),
+                        msg = "Lost a property!")
 
   cluster_area_1 <- left_join(all_clusters, cluster_size) |>
     filter(n_props == 1) |>
@@ -145,11 +146,7 @@ make_clusters <- function(max_area, df){
   cluster_return <- all_clusters |>
     select(-cluster_area_km2) |>
     left_join(bad_clusters) |>
-    mutate(cluster = as.numeric(as.factor(cluster))) |>
-    group_by(STATE) |>
-    mutate(state_cluster = cluster - min(cluster) + 1) |>
-    ungroup() |>
-    mutate(state_cluster = paste0(STATE, "-", state_cluster))
+    mutate(cluster = as.numeric(as.factor(cluster)))
 
   larger_than_max_area <- left_join(cluster_areas, cluster_size) |>
     filter(cluster_area_km2 > max_area)
@@ -170,15 +167,15 @@ process_model <- function(N, zeta, a_phi, b_phi){
 
 make_all_pp <- function(df){
 
-  clusters <- df |>
+  cluster_vec <- df |>
     pull(cluster) |>
     unique()
 
   all_timesteps <- tibble()
-  for(i in seq_along(clusters)){
+  for(i in seq_along(cluster_vec)){
 
     tmp <- df |>
-      filter(cluster == clusters[i])
+      filter(cluster == cluster_vec[i])
 
     cluster_props <- tmp |>
       pull(property) |>
@@ -188,9 +185,12 @@ make_all_pp <- function(df){
       pull(PPNum) |>
       range()
 
+    # message("i ", i)
+    # print(cluster_pps)
+
     for(j in seq_along(cluster_props)){
       tmpp <- tibble(
-        cluster = clusters[i],
+        cluster = cluster_vec[i],
         property = cluster_props[j],
         PPNum = cluster_pps[1]:cluster_pps[2]
       )
@@ -213,3 +213,41 @@ make_all_pp <- function(df){
   all_time_ids <- left_join(all_property_pp, all_cluster_pp)
 
 }
+
+check_input <- function(x){
+  assertthat::assert_that(
+    all(x > 0),
+    msg = "All input values must be positive!")
+}
+
+prec_2_sd <- function(prec){
+  check_input(prec)
+  return(sqrt(1 / prec))
+}
+
+prec_2_var <- function(prec){
+  check_input(prec)
+  return(1 / prec)
+}
+
+sd_2_prec <- function(sd){
+  check_input(sd)
+  return(sd ^ -2)
+}
+
+sd_2_var <- function(sd){
+  check_input(sd)
+  return(sd * sd)
+}
+
+var_2_prec <- function(v){
+  check_input(v)
+  return(1 / v)
+}
+
+var_2_sd <- function(v){
+  check_input(v)
+  return(sqrt(v))
+}
+
+
