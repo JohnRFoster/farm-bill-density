@@ -357,7 +357,7 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
   constants_nimble$psi_phi <- draw_value("psi_phi")
   log_nu <- draw_value("log_nu")
   constants_nimble$zeta <- 28 * exp(log_nu) / 365
-  constants_nimble$beta_p <- matrix(draw_value("beta_p"), 5, 3)
+  constants_nimble$beta_p <- matrix(runif(1, -1, 1), 5, 4)
   constants_nimble$beta1 <- draw_value("beta1")
   constants_nimble$omega <- draw_value("p_mu")
   constants_nimble$log_gamma <- draw_value("gamma")
