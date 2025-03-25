@@ -261,7 +261,7 @@ prep_nimble <- function(take, posterior_path){
   rate <- mu / v
 
   X <- take |>
-    select(c_road_den, c_rugged, c_canopy) |>
+    select(agriculture, forested, grassland, wetland) |>
     as.matrix()
 
   n_method <- length(unique(take$method))

@@ -182,12 +182,13 @@ while(n_method != 5){
     start_density = start_density,
     prop_ls = properties,
     n_pp = config$n_pp,
-    include_project,
-    include_cluster
+    include_project = include_project,
+    include_cluster = include_cluster
   )
 
   take <- simulated_data$all_take
   abundance <-  simulated_data$all_pigs
+  beta <- simulated_data$beta
 
   n_method <- length(unique(take$method))
 
@@ -470,7 +471,22 @@ round(sum(N_by_time_observed$recovered_flag) / nrow(N_by_time_observed) * 100, 1
 known_params <- read_csv("data/posterior_95CI_range_all.csv") |>
   suppressMessages() |>
   select(node, med) |>
-  rename(actual = med)
+  rename(actual = med) |>
+  filter(!grepl("beta_p", node))
+
+beta_p <- beta[,-1]
+colnames(beta_p) <- 1:4
+beta_p_long <- beta_p |>
+  as_tibble() |>
+  mutate(method = 1:5) |>
+  pivot_longer(cols = -method,
+               names_to = "position",
+               values_to = "actual") |>
+  mutate(node = paste0("beta_p[", method, ", ", position, "]")) |>
+  select(node, actual)
+
+known_params <- bind_rows(known_params, beta_p_long) |>
+  arrange(node)
 
 alpha_cluster <- take |>
   select(cluster, alpha_cluster) |>

@@ -17,7 +17,8 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     mutate(idx = method) |>
     distinct()
 
-  start_density <- start_density
+  habitat_data <- read_csv("data/habitat_proportions.csv")
+
   hierarchy <- "Poisson"
 
   params <- read_csv("data/posterior_95CI_range_all.csv") |>
@@ -33,8 +34,13 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
   phi_mu <- draw_value("phi_mu")
   psi_phi <- draw_value("psi_phi")
   nu <- draw_value("nu")
-  beta_p <- matrix(draw_value("beta_p"), 5, 3, byrow = TRUE)
+  # beta_p <- matrix(draw_value("beta_p"), 5, 3, byrow = TRUE)
   beta1 <- matrix(draw_value("beta1"), 5, 1)
+  beta_p <- matrix(
+    runif(20, -4, 4),
+    nrow = 5,
+    ncol = 4
+  )
   beta <- cbind(beta1, beta_p)
   omega <- draw_value("omega")
   p_unique <- omega
@@ -121,7 +127,12 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     cluster_re <- prop_tmp_in_cluster$alpha_cluster
 
     n_props <- length(prop_tmp)
-    X <- matrix(rnorm(3 * n_props), n_props, 3)
+
+    draws <- sample.int(nrow(habitat_data), n_props)
+    X <- habitat_data |>
+      slice(draws) |>
+      select(-AgrID) |>
+      as.matrix()
 
     single_property_cluster <- if_else(n_props == 1, TRUE, FALSE)
 
@@ -217,9 +228,10 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
                    N = nn,
                    M = M[t],
                    M_actual = M_actual[t],
-                   c_road_den = X[j, 1],
-                   c_rugged = X[j, 2],
-                   c_canopy = X[j ,3])
+                   agriculture = X[j, 1],
+                   forested = X[j, 2],
+                   grassland = X[j ,3],
+                   wetland = X[j, 4])
 
           take <- bind_rows(take, take_t)
           Y[j] <- sum(take_t$take)
@@ -350,7 +362,8 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
 
   return(list(
     all_pigs = pigs_return,
-    all_take = take_return
+    all_take = take_return,
+    beta = beta
   ))
 }
 

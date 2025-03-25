@@ -70,10 +70,7 @@ conduct_removals <- function(N, removal_order, effort_data, log_survey_area, X, 
     # probability of capture, given that an individual is in the surveyed area
     log_theta[r] <- log(
       boot::inv.logit(
-        beta_p[m, 1] +
-          beta_p[m, 2] * X[1] +
-          beta_p[m, 3] * X[2] +
-          beta_p[m, 4] * X[3] +
+        nimble::inprod(c(1, X), beta_p[m, ]) +
         alpha_project +
         alpha_cluster)
       ) +
