@@ -42,11 +42,18 @@ trace_plot <- function(post, nodes_2_plot, thin = 5000){
   return(gg)
 }
 
-config_name <- "hpc_production"
+config_name <- "hpc_test"
 config <- config::get(config = config_name)
 
+if(include_project){
+  model_dir <- if_else(include_cluster, "project_cluster", "project")
+} else {
+  model_dir <- if_else(include_cluster, "cluster", "base")
+}
+
+
 # simulations are stored here
-out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir)
+out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, model_dir)
 
 sim_files <- list.files(out_dir)
 
