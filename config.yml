@@ -9,7 +9,7 @@ default:
   n_pp: 20
   n_mcmc: 500
   n_iter: 5000
-  include_project: TRUE
+  include_project: FALSE
   include_cluster: FALSE
 
 hpc_test:
@@ -25,4 +25,4 @@ hpc_production:
   dev_dir: "production"
   n_pp: 40
   n_mcmc: 1000
-  n_iter: 500000
+  n_iter: 250000
