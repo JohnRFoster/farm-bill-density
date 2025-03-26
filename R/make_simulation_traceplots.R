@@ -45,6 +45,12 @@ trace_plot <- function(post, nodes_2_plot, thin = 5000){
 config_name <- "hpc_test"
 config <- config::get(config = config_name)
 
+include_project <- config$include_project
+include_cluster <- config$include_cluster
+
+message("Project random effect: ", include_project)
+message("Cluster random effect: ", include_cluster)
+
 if(include_project){
   model_dir <- if_else(include_cluster, "project_cluster", "project")
 } else {
