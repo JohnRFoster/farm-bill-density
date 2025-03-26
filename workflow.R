@@ -20,10 +20,10 @@
 # 3. Summarize output
 #
 # --------------------------------------------------------------------
-
+#
 # config_name <- "default"
-config_name <- "hpc_test"
-# config_name <- "hpc_production"
+# config_name <- "hpc_test"
+config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
@@ -238,9 +238,15 @@ params_check <- c(
   "psi_phi"
 )
 
+c_samp <- tibble(
+  node = c("phi_mu", "psi_phi"),
+  type = c("slice",  "slice")
+)
+
 if(include_project){
   monitors_add <- c(monitors_add, "alpha_project")
   params_check <- c(params_check, "tau_project")
+  c_samp <- bind_rows(c_samp, tibble(node = "alpha_project", type = "AF_slice"))
 }
 
 if(include_cluster){
@@ -250,11 +256,6 @@ if(include_cluster){
 
 n_chains <- config$n_chains
 cl <- makeCluster(n_chains)
-
-c_samp <- tibble(
-  node = c("phi_mu", "psi_phi"),
-  type = c("slice",  "slice")
-)
 
 samples <- fit_mcmc(
   cl = cl,
