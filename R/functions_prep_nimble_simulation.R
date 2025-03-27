@@ -265,6 +265,7 @@ prep_nimble <- function(take, posterior_path){
     as.matrix()
 
   n_method <- length(unique(take$method))
+  n_betaP <- n_method * ncol(X)
 
   constants <- list(
     n_clusters = n_clusters,
@@ -279,6 +280,7 @@ prep_nimble <- function(take, posterior_path){
     n_multi_property_clusters = n_grouped_properties,
     n_time_single_property_clusters = n_time_single_property_clusters,
     n_time_multi_property_clusters = n_time_multi_property_clusters,
+    n_betaP = n_betaP,
     mH = as.matrix(mH),
     nH_single = as.matrix(nH_single),
     nH_multi = as.matrix(nH_multi),
@@ -305,15 +307,14 @@ prep_nimble <- function(take, posterior_path){
     log_gamma_tau = rep(3, 2),
     beta1_mu = rep(0, 5),
     beta1_tau = rep(1, 5),
-    beta_p_mu = rep(0, 15),
-    beta_p_tau = rep(1, 15),
+    beta_p_mu = rep(0, n_betaP),
+    beta_p_tau = rep(1, n_betaP),
     phi_mu_a = 1,
     phi_mu_b = 1,
     psi_shape = 1,
     psi_rate = 0.1,
     log_nu_mu = 2,
     log_nu_tau = 1,
-    n_betaP = n_method * ncol(X),
     beta_p_row = rep(1:n_method, each = ncol(X)),
     beta_p_col = rep(1:ncol(X), n_method)
   )
