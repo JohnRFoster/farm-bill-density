@@ -17,7 +17,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     mutate(idx = method) |>
     distinct()
 
-  habitat_data <- read_csv("data/habitat_proportions.csv")
+  # habitat_data <- read_csv("data/habitat_proportions.csv")
 
   hierarchy <- "Poisson"
 
@@ -128,11 +128,11 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
 
     n_props <- length(prop_tmp)
 
-    draws <- sample.int(nrow(habitat_data), n_props)
-    X <- habitat_data |>
-      slice(draws) |>
-      select(-AgrID) |>
-      as.matrix()
+    X <- matrix(
+      data = rnorm(n_props * 4, 0, 0.5),
+      nrow = n_props,
+      ncol = 4
+    )
 
     single_property_cluster <- if_else(n_props == 1, TRUE, FALSE)
 
