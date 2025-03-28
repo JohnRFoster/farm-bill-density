@@ -21,6 +21,9 @@
 #
 # --------------------------------------------------------------------
 #
+
+start_time <- Sys.time()
+
 # config_name <- "default"
 # config_name <- "hpc_test"
 config_name <- "hpc_production"
@@ -71,7 +74,6 @@ source("R/one_method_properties.R")
 # -----------------------------------------------------------------
 message("MIS data intake")
 df <- read_csv("data/clusters250km2.csv") |>
-  filter(STATE == "OK") |>
   mutate(property = as.numeric(as.factor(propertyID)))
 
 end_dates <- unique(sort(df$end.date))
@@ -126,7 +128,7 @@ n_property_lookup <- df_with_timesteps |>
 n_rel <- n_property_lookup |>
   count(n_props_in_cluster, name = "n_clusters") |>
   mutate(rel_prop = n_clusters / sum(n_clusters),
-         n_clusters_to_sim = ceiling(rel_prop * 40),
+         n_clusters_to_sim = ceiling(rel_prop * 50),
          n_props_to_sim = n_clusters_to_sim * n_props_in_cluster)
 
 n_clusters_to_sim <- sum(n_rel$n_clusters_to_sim)
@@ -213,10 +215,9 @@ take |>
   count(cluster, name = "n_properties_in_cluster") |>
   count(n_properties_in_cluster)
 
-take |>
-  select(project, cluster) |>
-  distinct() |>
-  arrange(project, cluster)
+message("Number of properties in simulated data: ", length(unique(take$property)))
+message("Number of clusters in simulated data: ", length(unique(take$cluster)))
+message("Number of projects in simulated data: ", length(unique(take$project)))
 
 message("Prep data for MCMC")
 nimble_ls <- prep_nimble(take, config$posterior_path) |> suppressMessages()
@@ -532,7 +533,8 @@ write_rds(out, file.path(out_dir, "simulationData.rds"))
 
 
 
-
+message("Total runtime")
+print(Sys.time() - start_time)
 
 
 
