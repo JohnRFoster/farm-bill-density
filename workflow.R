@@ -128,7 +128,7 @@ n_property_lookup <- df_with_timesteps |>
 n_rel <- n_property_lookup |>
   count(n_props_in_cluster, name = "n_clusters") |>
   mutate(rel_prop = n_clusters / sum(n_clusters),
-         n_clusters_to_sim = ceiling(rel_prop * 50),
+         n_clusters_to_sim = ceiling(rel_prop * 100),
          n_props_to_sim = n_clusters_to_sim * n_props_in_cluster)
 
 n_clusters_to_sim <- sum(n_rel$n_clusters_to_sim)
@@ -247,7 +247,6 @@ c_samp <- tibble(
 if(include_project){
   monitors_add <- c(monitors_add, "alpha_project")
   params_check <- c(params_check, "tau_project")
-  c_samp <- bind_rows(c_samp, tibble(node = "alpha_project", type = "AF_slice"))
 }
 
 if(include_cluster){
