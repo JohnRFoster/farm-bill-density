@@ -1,5 +1,5 @@
 default:
-  n_chains: 5
+  n_chains: 3
   project_dir: ""
   data_dir: "data"
   out_dir: "out"
