@@ -9,8 +9,8 @@ default:
   n_pp: 20
   n_mcmc: 500
   n_iter: 5000
-  include_project: FALSE
-  include_cluster: TRUE
+  include_project: TRUE
+  include_cluster: FALSE
 
 hpc_test:
   project_dir: "/lustrefs/ceah/feral-swine/farm-bill"
