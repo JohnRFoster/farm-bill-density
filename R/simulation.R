@@ -303,12 +303,21 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
   } # cluster loop
   close(pb)
 
+  take_filter <- all_take |>
+    group_by(cluster) |>
+    summarise(total_take = sum(take)) |>
+    ungroup() |>
+    filter(total_take > 0) |>
+    pull(cluster)
+
   good_clusters <- all_take |>
+    filter(cluster %in% take_filter) |>
     select(cluster, PPNum) |>
     distinct() |>
     group_by(cluster) |>
     mutate(nt = 1:n()) |>
-    filter(max(nt) > 1) |>
+    ungroup() |>
+    filter(nt > 1) |>
     pull(cluster) |>
     unique()
 
