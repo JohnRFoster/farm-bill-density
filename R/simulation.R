@@ -252,7 +252,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
       } # property loop
 
       # need to use the realized cluster size in case all pigs are removed
-      Z <- M[t] - sum(Y)
+      Z <- max(c(M[t], M_actual[t])) - sum(Y)
 
       identifier <- paste0("\nCluster ", i, "\nTime ", t)
       assertthat::assert_that(Z >= 0,
