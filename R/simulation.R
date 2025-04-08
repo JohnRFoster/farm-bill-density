@@ -21,19 +21,21 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
 
   hierarchy <- "Poisson"
 
-  params <- read_csv("data/posterior_95CI_range_all.csv") |>
-    suppressMessages()
+  params <- read_rds("data/posteriorSamples.rds")
+  params <- params |> slice(sample.int(nrow(params), 1))
 
   draw_value <- function(x){
     params |>
-      filter(grepl(x, node)) |>
-      pull(med) |>
-      round(2)
+      select(contains(x)) |>
+      pivot_longer(cols = everything()) |>
+      pull(value)
+
   }
 
   phi_mu <- draw_value("phi_mu")
   psi_phi <- draw_value("psi_phi")
-  nu <- draw_value("nu")
+  log_nu <- draw_value("log_nu")
+  nu <- exp(log_nu)
   # beta_p <- matrix(draw_value("beta_p"), 5, 3, byrow = TRUE)
   beta1 <- matrix(draw_value("beta1"), 5, 1)
   beta_p <- matrix(
@@ -42,12 +44,12 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     ncol = 4
   )
   beta <- cbind(beta1, beta_p)
-  omega <- draw_value("omega")
-  p_unique <- omega
-  gamma <- draw_value("gamma")
-  log_gamma <- log(gamma)
-  rho <- draw_value("rho")
-  log_rho <- log(rho)
+  p_unique <- draw_value("p_mu")
+  omega <- boot::inv.logit(p_unique)
+  log_gamma <- draw_value("log_gamma")
+  gamma <- exp(gamma)
+  log_rho <- draw_value("log_rho")
+  rho <- exp(log_rho)
 
   a_phi <- phi_mu * psi_phi
   b_phi <- (1 - phi_mu) * psi_phi
