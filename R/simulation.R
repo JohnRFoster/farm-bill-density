@@ -47,7 +47,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
   p_unique <- draw_value("p_mu")
   omega <- boot::inv.logit(p_unique)
   log_gamma <- draw_value("log_gamma")
-  gamma <- exp(gamma)
+  gamma <- exp(log_gamma)
   log_rho <- draw_value("log_rho")
   rho <- exp(log_rho)
 
@@ -218,7 +218,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
             pp = t,
             log_rho = log_rho,
             log_gamma = log_gamma,
-            p_unique = p_unique,
+            p_unique = omega,
             method_lookup = method_lookup,
             alpha_project = project_re[j],
             alpha_cluster = cluster_re[j]) |>
