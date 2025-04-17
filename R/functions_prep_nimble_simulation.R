@@ -341,7 +341,8 @@ prep_nimble <- function(take, posterior_path){
   )
 }
 
-nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 100){
+nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 100,
+                         include_cluster, include_project){
 
   params <- read_rds("data/posteriorSamples.rds")
   params <- params |> slice(sample.int(nrow(params), 1))
@@ -419,7 +420,7 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     }
 
 
-    list(
+    rr <- list(
       log_lambda_1 = log(M_init + buffer),
       beta_p = beta_p,
       beta1 = beta1,
@@ -437,12 +438,26 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       log_rho = log_rho,
       phi = phi,
       zeta = zeta,
-      log_zeta = log(zeta),
-      tau_project = runif(1, 1e-04, 1),
-      tau_cluster = runif(1, 1e-04, 1),
-      alpha_project = rnorm(n_projects, 0, 1),
-      alpha_cluster = rnorm(n_clusters, 0, 1)
+      log_zeta = log(zeta)
     )
+
+    if(include_cluster){
+      rr <- append(rr,
+                   list(
+                     tau_cluster = runif(1, 1e-04, 1),
+                     alpha_cluster = rnorm(n_clusters, 0, 1)
+                   ))
+    }
+
+    if(include_project){
+      rr <- append(rr,
+                   list(
+                     tau_project = runif(1, 1e-04, 1),
+                     alpha_project = rnorm(n_projects, 0, 1)
+                   ))
+    }
+
+    return(rr)
 
   })
 }
