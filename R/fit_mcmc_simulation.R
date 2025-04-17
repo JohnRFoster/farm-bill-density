@@ -38,6 +38,11 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
     library(nimble)
     source("R/calc_log_potential_area.R")
 
+    if(include_project_cluster){
+      include_project <- FALSE
+      include_cluster <- FALSE
+    }
+
     Rmodel <- nimbleModel(
       code = modelCode,
       constants = constants,
