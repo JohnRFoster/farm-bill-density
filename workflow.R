@@ -239,10 +239,7 @@ params_check <- c(
   "psi_phi"
 )
 
-c_samp <- tibble(
-  node = c("phi_mu", "psi_phi"),
-  type = c("slice",  "slice")
-)
+c_samp <- NULL
 
 if(include_project){
   monitors_add <- c(monitors_add, "alpha_project")
