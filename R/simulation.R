@@ -39,7 +39,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
   # beta_p <- matrix(draw_value("beta_p"), 5, 3, byrow = TRUE)
   beta1 <- matrix(draw_value("beta1"), 5, 1)
   beta_p <- matrix(
-    runif(20, -4, 4),
+    runif(20, -2, 2),
     nrow = 5,
     ncol = 4
   )
