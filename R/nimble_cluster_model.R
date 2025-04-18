@@ -27,7 +27,7 @@ modelCode <- nimbleCode({
   }
 
   # project random effect - in data model
-  if(include_project){
+  if(project_prior){
 
     tau_project ~ dgamma(1, 1)
 
@@ -38,7 +38,7 @@ modelCode <- nimbleCode({
   }
 
   # cluster random effect - in data model
-  if(include_cluster){
+  if(cluster_prior){
 
     tau_cluster ~ dgamma(1, 1)
 

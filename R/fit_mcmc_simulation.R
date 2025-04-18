@@ -8,6 +8,8 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
 
   base <- if_else(!include_project & !include_cluster, TRUE, FALSE)
   include_project_cluster <- if_else(include_project & include_cluster, TRUE, FALSE)
+  project_prior <- if_else(include_project, TRUE, FALSE)
+  cluster_prior <- if_else(include_cluster, TRUE, FALSE)
 
   export <- c(
     "modelCode",
@@ -19,7 +21,9 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
     "include_project",
     "include_cluster",
     "include_project_cluster",
-    "base"
+    "base",
+    "project_prior",
+    "cluster_prior"
   )
 
   clusterExport(cl, export, envir = environment())
