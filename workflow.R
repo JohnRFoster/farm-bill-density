@@ -239,12 +239,7 @@ params_check <- c(
   "psi_phi"
 )
 
-c_samp <- tribble(
-  ~node,     ~type,
-  "phi_mu",  "slice",
-  "psi_phi", "slice",
-  "log_nu",  "slice"
-)
+c_samp <- NULL
 
 if(include_project){
   monitors_add <- c(monitors_add, "alpha_project")
