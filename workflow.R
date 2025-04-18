@@ -25,8 +25,8 @@
 start_time <- Sys.time()
 
 # config_name <- "default"
-# config_name <- "hpc_test"
-config_name <- "hpc_production"
+config_name <- "hpc_test"
+# config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
@@ -239,7 +239,12 @@ params_check <- c(
   "psi_phi"
 )
 
-c_samp <- NULL
+c_samp <- tribble(
+  ~node,     ~type,
+  "phi_mu",  "slice",
+  "psi_phi", "slice",
+  "log_nu",  "slice"
+)
 
 if(include_project){
   monitors_add <- c(monitors_add, "alpha_project")
