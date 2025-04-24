@@ -305,15 +305,23 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
   } # cluster loop
   close(pb)
 
-  take_filter <- all_take |>
-    group_by(cluster) |>
-    summarise(total_take = sum(take)) |>
-    ungroup() |>
-    filter(total_take > 0) |>
-    pull(cluster)
+  take_filter <- function(df, x){
+    df |>
+      group_by(.data[[x]]) |>
+      summarise(total_take = sum(take)) |>
+      ungroup() |>
+      filter(total_take > 0) |>
+      pull(.data[[x]])
+  }
+
+  project_filter <- all_take |>
+    take_filter("project")
+
+  cluster_filter <- all_take |>
+    take_filter("cluster")
 
   good_clusters <- all_take |>
-    filter(cluster %in% take_filter) |>
+    filter(cluster %in% cluster_filter) |>
     select(cluster, PPNum) |>
     distinct() |>
     group_by(cluster) |>
@@ -323,14 +331,23 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     pull(cluster) |>
     unique()
 
+  good_projects <- all_take |>
+    select(project, cluster) |>
+    distinct() |>
+    count(project) |>
+    filter(n > 1) |>
+    pull(project)
+
   all_take <- left_join(all_take, group_lookup) |>
     select(-projects, -clusters) |>
-    filter(cluster %in% good_clusters) |>
+    filter(cluster %in% good_clusters,
+           project %in% good_projects) |>
     arrange(property, PPNum, order)
 
   all_pigs <- known_abundance |>
     filter(!is.na(M),
            cluster %in% good_clusters,
+           project %in% good_projects,
            property %in% unique(all_take$property)) |>
     arrange(property, PPNum)
 
