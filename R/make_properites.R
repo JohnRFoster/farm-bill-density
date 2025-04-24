@@ -20,10 +20,6 @@ make_properites <- function(df, n_clusters, n_props_in_each_cluster, n_pp){
     count(n_method) |>
     mutate(p = n / sum(n))
 
-  areas <- df |>
-    filter(cluster %in% cluster_sub) |>
-    pull(cluster_area_km2)
-
   p <- prop$p
   n_method <- prop$n_method
   properties <- list()
