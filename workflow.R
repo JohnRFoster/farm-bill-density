@@ -25,8 +25,8 @@
 start_time <- Sys.time()
 
 # config_name <- "default"
-# config_name <- "hpc_test"
-config_name <- "hpc_production"
+config_name <- "hpc_test"
+# config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
