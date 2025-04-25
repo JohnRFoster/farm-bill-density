@@ -331,23 +331,35 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     pull(cluster) |>
     unique()
 
-  good_projects <- all_take |>
+  good_projects1 <- all_take |>
+    filter(project %in% project_filter) |>
     select(project, cluster) |>
     distinct() |>
     count(project) |>
     filter(n > 1) |>
     pull(project)
 
+  good_projects2 <- all_take |>
+    filter(project %in% good_projects1) |>
+    select(project, PPNum) |>
+    distinct() |>
+    group_by(project) |>
+    mutate(nt = 1:n()) |>
+    ungroup() |>
+    filter(nt > 1) |>
+    pull(project) |>
+    unique()
+
   all_take <- left_join(all_take, group_lookup) |>
     select(-projects, -clusters) |>
     filter(cluster %in% good_clusters,
-           project %in% good_projects) |>
+           project %in% good_projects2) |>
     arrange(property, PPNum, order)
 
   all_pigs <- known_abundance |>
     filter(!is.na(M),
            cluster %in% good_clusters,
-           project %in% good_projects,
+           project %in% good_projects2,
            property %in% unique(all_take$property)) |>
     arrange(property, PPNum)
 
