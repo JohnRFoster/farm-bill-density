@@ -196,6 +196,19 @@ while(n_method != 5){
 
 }
 
+if(include_project){
+  model_dir <- if_else(include_cluster, "project_cluster", "project")
+} else {
+  model_dir <- if_else(include_cluster, "cluster", "base")
+}
+
+out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, model_dir, task_id)
+message("\n\nWriting to: ", out_dir)
+if(!dir.exists(out_dir)) dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+write_rds(take, file.path(out_dir, "simulatedTake.rds"))
+write_rds(abundance, file.path(out_dir, "simulatedAbundance.rds"))
+
 if(config_name == "default"){
   library(ggplot2)
 
@@ -271,18 +284,10 @@ samples <- fit_mcmc(
 
 stopCluster(cl)
 
-if(include_project){
-  model_dir <- if_else(include_cluster, "project_cluster", "project")
-} else {
-  model_dir <- if_else(include_cluster, "cluster", "base")
-}
-
-out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, model_dir, task_id)
-message("\n\nWriting to: ", out_dir)
-
-if(!dir.exists(out_dir)) dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 samples_mcmc <- as.mcmc.list(samples)
+
+write_rds(samples_mcmc, file.path(out_dir, "rawMCMCsamples.rds"))
 
 out <- check_mcmc(
   samples = samples_mcmc,
