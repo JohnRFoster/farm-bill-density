@@ -80,7 +80,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
 
   # project and cluster random effects if used
   if(include_project){
-    tau_project <- rgamma(1, 1, 1)
+    tau_project <- runif(1, 0.001, 4)
     alpha_project <- rnorm(n_projects, 0, prec_2_sd(tau_project))
   } else {
     tau_project <- NA
@@ -94,7 +94,7 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
            alpha_project = alpha_project)
 
   if(include_cluster){
-    tau_cluster <- rgamma(1, 1, 1)
+    tau_cluster <- runif(1, 0.001, 4)
     alpha_cluster <- rnorm(n_clusters, 0, prec_2_sd(tau_cluster))
   } else {
     tau_cluster <- NA
