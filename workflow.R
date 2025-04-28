@@ -38,7 +38,7 @@ if(grepl("hpc", config_name)){
   task_id <- args[1]
 
 } else {
-  task_id <- 1
+  task_id <- 3
 }
 
 message("Task ID: ", task_id)
@@ -234,6 +234,8 @@ message("Number of projects in simulated data: ", length(unique(take$project)))
 
 message("Prep data for MCMC")
 nimble_ls <- prep_nimble(take, config$posterior_path) |> suppressMessages()
+write_rds(nimble_ls, file.path(out_dir, "nimbleData.rds"))
+
 nimble_data <- nimble_ls$data
 nimble_constants <- nimble_ls$constants
 
