@@ -442,18 +442,20 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     )
 
     if(include_cluster){
+      tau <- runif(1, 0.01, 3)
       rr <- append(rr,
                    list(
-                     tau_cluster = runif(1, 0.01, 3),
-                     alpha_cluster = rnorm(n_clusters, 0, sqrt(1 / tau_cluster))
+                     tau_cluster = tau,
+                     alpha_cluster = rnorm(n_clusters, 0, sqrt(tau))
                    ))
     }
 
     if(include_project){
+      tau <- runif(1, 0.01, 3)
       rr <- append(rr,
                    list(
-                     tau_project = runif(1, 0.01, 3),
-                     alpha_project = rnorm(n_projects, 0, sqrt(1 / tau_project))
+                     tau_project = tau,
+                     alpha_project = rnorm(n_projects, 0, sqrt(tau))
                    ))
     }
 
