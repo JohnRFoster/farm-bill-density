@@ -320,14 +320,6 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
   cluster_filter <- all_take |>
     take_filter("cluster")
 
-  good_clusters <- all_take |>
-    filter(cluster %in% cluster_filter) |>
-    select(cluster, PPNum) |>
-    distinct() |>
-    count(cluster) |>
-    filter(n >= 2) |>
-    pull(cluster)
-
   good_projects1 <- all_take |>
     filter(project %in% project_filter) |>
     select(project, cluster) |>
@@ -340,12 +332,18 @@ simulate_cluster_dynamics <- function(start_density, prop_ls, n_pp, include_proj
     filter(project %in% good_projects1) |>
     select(project, PPNum) |>
     distinct() |>
-    group_by(project) |>
-    mutate(nt = 1:n()) |>
-    ungroup() |>
-    filter(nt > 1) |>
-    pull(project) |>
-    unique()
+    count(project) |>
+    filter(n >= 2) |>
+    pull(project)
+
+  good_clusters <- all_take |>
+    filter(project %in% good_projects2,
+           cluster %in% cluster_filter) |>
+    select(cluster, PPNum) |>
+    distinct() |>
+    count(cluster) |>
+    filter(n >= 2) |>
+    pull(cluster)
 
   all_take <- left_join(all_take, group_lookup) |>
     select(-projects, -clusters) |>
