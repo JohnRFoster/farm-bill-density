@@ -111,6 +111,7 @@ fit_mcmc <- function(cl, task_seed, modelCode, data, constants, start_density,
     runMCMC(
       Cmcmc,
       niter = n_iter,
+      nburnin = n_iter / 2,
       nchains = 1,
       thin = 10,
       samplesAsCodaMCMC = TRUE
