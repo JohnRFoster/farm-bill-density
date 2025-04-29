@@ -309,12 +309,12 @@ prep_nimble <- function(take, posterior_path){
     beta1_tau = rep(1, 5),
     beta_p_mu = rep(0, n_betaP),
     beta_p_tau = rep(1, n_betaP),
-    phi_mu_a = 1,
-    phi_mu_b = 1,
-    psi_shape = 1,
-    psi_rate = 0.1,
-    log_nu_mu = 2,
-    log_nu_tau = 1,
+    phi_mu_a = alpha,
+    phi_mu_b = beta,
+    psi_shape = shape,
+    psi_rate = rate,
+    log_nu_mu = log_nu$mu,
+    log_nu_tau = log_nu$tau,
     beta_p_row = rep(1:n_method, each = ncol(X)),
     beta_p_col = rep(1:ncol(X), n_method)
   )
