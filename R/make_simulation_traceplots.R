@@ -10,6 +10,8 @@ library(readr)
 library(ggplot2)
 library(coda)
 
+source("R/functions_misc.R")
+
 # function to create traceplots from thinned posterior
 trace_plot <- function(post, nodes_2_plot, thin = 5000){
   df <- post |>
@@ -71,7 +73,6 @@ for(i in seq_along(sim_files)){
   task_dir <- file.path(out_dir, task_id)
   message("\n\n====", task_dir, "====")
 
-
   out_file <- file.path(task_dir, "parameterSamples.rds")
 
   # traceplots_exist <- any(grepl("mcmcTimeseries_", list.files(task_dir)))
@@ -96,6 +97,8 @@ for(i in seq_along(sim_files)){
     message("  done")
 
 
+  } else {
+    next
   }
 
   nodes <- setdiff(colnames(posterior), "chain")
@@ -126,6 +129,137 @@ for(i in seq_along(sim_files)){
   close(pb)
 
   message("Parameters Done")
+
+  params_samples <- posterior |>
+    as_tibble() |>
+    mutate(
+      `gamma[1]` = exp(`log_gamma[1]`),
+      `gamma[2]` = exp(`log_gamma[2]`),
+      `omega[1]` = boot::inv.logit(`p_mu[1]`),
+      `omega[2]` = boot::inv.logit(`p_mu[2]`),
+      `rho[1]` = exp(`log_rho[1]`),
+      `rho[2]` = exp(`log_rho[2]`),
+      `rho[3]` = exp(`log_rho[3]`),
+      `rho[4]` = exp(`log_rho[4]`),
+      `rho[5]` = exp(`log_rho[5]`),
+      nu = exp(log_nu),
+    )
+
+  data <- read_rds(file.path(task_dir, "simulationData.rds"))
+
+  if(model_dir == "base"){
+    params_actual <- data$params_actual |>
+      filter(
+        !grepl("alpha", node),
+        !grepl("tau", node)
+      )
+  } else if (model_dir == "project"){
+    params_actual <- data$params_actual |>
+      filter(
+        !grepl("alpha_cluster", node),
+        !grepl("tau_cluster", node)
+      )
+  } else if (model_dir == "cluster"){
+    params_actual <- data$params_actual |>
+      filter(
+        !grepl("alpha_project", node),
+        !grepl("tau_project", node)
+      )
+  } else if (model_dir == "project_cluster"){
+    params_actual <- data$params_actual
+  }
+
+  make_prior <- function(p, sd = NULL){
+    n <- 10000
+
+    if(grepl("beta", p)) x <- rnorm(n, 0, 1)
+    if(grepl("rho", p)) x <- exp(rnorm(n, 0, 1))
+    if(grepl("gamma", p)) x <- exp(rnorm(n, 0, prec_2_sd(3)))
+    if(grepl("nu", p)) x <- exp(rnorm(n, 2, 1))
+    if(grepl("omega", p)) x <- boot::inv.logit(rnorm(n, 0, 1))
+    if(grepl("tau", p)) x <- rgamma(n, 1, 1)
+    if(grepl("phi_mu", p)) x <- rbeta(n, 1, 1)
+    if(grepl("psi", p)) x <- rgamma(n, 1, 0.1)
+    if(grepl("alpha", p)) x <- rnorm(length(sd), 0, sd)
+
+    tibble(
+      value = x,
+      dist = "Prior"
+    )
+
+  }
+
+  g <- list()
+  for(j in 1:nrow(params_actual)){
+
+    p <- params_actual$node[j]
+    v <- params_actual$actual[j]
+
+    post <- tibble(
+      dist = "Posterior",
+      value = params_samples[[p]]
+    )
+
+    if(grepl("alpha", p)){
+      if(grepl("cluster", p)) sd <- prec_2_sd(params_samples[["tau_cluster"]])
+      if(grepl("project", p)) sd <- prec_2_sd(params_samples[["tau_project"]])
+    } else {
+      sd <- NULL
+    }
+
+    prior <- make_prior(p, sd)
+
+    df <- bind_rows(post, prior) |>
+      mutate(dist = factor(dist, levels = c("Prior", "Posterior")))
+
+    xlim <- df |>
+      filter(dist == "Posterior") |>
+      pull(value) |>
+      range()
+
+    g[[j]] <- df |>
+      ggplot() +
+      aes(x = value,
+          y = after_stat(scaled),
+          fill = dist,
+          color = dist) +
+      geom_density(alpha = 0.5) +
+      geom_vline(xintercept = v, linewidth = 1, linetype = "dashed") +
+      scale_color_manual(values = c(
+        "Posterior" = "black",
+        "Prior" = "red"
+      )) +
+      scale_fill_manual(values = c(
+        "Posterior" = "lightblue",
+        "Prior" = "white"
+      )) +
+      coord_cartesian(xlim = xlim) +
+      labs(x = "Value",
+           y = "Density",
+           color = "Distribution",
+           fill = "Distribution",
+           title = p) +
+      theme_bw()
+
+  }
+
+  ggg <- do.call(ggpubr::ggarrange,
+                 list(
+                   plotlist = g,
+                   nrow = 4,
+                   ncol = 4,
+                   common_legend = TRUE,
+                   legend = "none"
+                 )
+  )
+
+  for(j in 1:length(ggg)){
+    filename <- file.path(task_dir, paste0("priorPosterior_", sprintf("%03d", j), ".pdf"))
+    ggsave(filename, ggg[[j]], units = "cm", width = 18, height = 18)
+  }
+
+
+
 
 }
 
