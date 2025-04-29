@@ -3,8 +3,17 @@ library(readr)
 config_name <- "hpc_production"
 config <- config::get(config = config_name)
 
+include_project <- config$include_project
+include_cluster <- config$include_cluster
+
+if(include_project){
+  model_dir <- if_else(include_cluster, "project_cluster", "project")
+} else {
+  model_dir <- if_else(include_cluster, "cluster", "base")
+}
+
 # simulations are stored here
-out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir)
+out_dir <- file.path(config$project_dir, config$out_dir, config$dev_dir, model_dir)
 
 sim_files <- list.files(out_dir)
 
@@ -32,8 +41,11 @@ for(i in seq_along(sim_files)){
     psrf <- out_data$psrf
     psrf <- psrf[row.names(psrf) != "psi_phi",]
     psrf <- psrf[row.names(psrf) != "phi_mu",]
+    psrf <- psrf[row.names(psrf) != "log_nu",]
 
     good <- all(psrf[,1] <= 1.1)
+
+    converged[i] <- if_else(good, 1, 0)
 
     if(good){
       start_density <- out_data$start_density
@@ -55,6 +67,8 @@ for(i in seq_along(sim_files)){
 
       N_by_cluster <- out_data$N_by_cluster |> mutate(start_density = start_density, simulation = task_id)
       all_N_by_cluster <- bind_rows(all_N_by_cluster, N_by_cluster)
+
+
 
     }
   }
