@@ -25,8 +25,8 @@
 start_time <- Sys.time()
 
 # config_name <- "default"
-# config_name <- "hpc_test"
-config_name <- "hpc_production"
+config_name <- "hpc_test"
+# config_name <- "hpc_production"
 config <- config::get(config = config_name)
 interval <- 4
 
@@ -254,7 +254,12 @@ params_check <- c(
   "psi_phi"
 )
 
-c_samp <- NULL
+c_samp <- tribble(
+  ~node,     ~type,
+  "psi_phi", "slice",
+  "phi_mu",  "slice",
+  "log_nu",  "slice"
+)
 
 if(include_project){
   monitors_add <- c(monitors_add, "alpha_project")
@@ -289,7 +294,7 @@ stopCluster(cl)
 
 samples_mcmc <- as.mcmc.list(samples)
 
-write_rds(samples_mcmc, file.path(out_dir, "rawMCMCsamples.rds"))
+# write_rds(samples_mcmc, file.path(out_dir, "rawMCMCsamples.rds"))
 
 out <- check_mcmc(
   samples = samples_mcmc,
