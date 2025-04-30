@@ -38,7 +38,7 @@ if(grepl("hpc", config_name)){
   task_id <- args[1]
 
 } else {
-  task_id <- 3
+  task_id <- 18
 }
 
 message("Task ID: ", task_id)
