@@ -44,7 +44,7 @@ trace_plot <- function(post, nodes_2_plot, thin = 5000){
   return(gg)
 }
 
-config_name <- "hpc_production"
+config_name <- "hpc_test"
 config <- config::get(config = config_name)
 
 include_project <- config$include_project
