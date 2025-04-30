@@ -425,37 +425,31 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       beta_p = beta_p,
       beta1 = beta1,
       p_mu = omega,
-      p_unique =  boot::inv.logit(omega),
       phi_mu = phi_mu,
       psi_phi = psi_phi,
-      a_phi = a,
-      b_phi = b,
       N = N + buffer,
       M = M + buffer,
       # lambda = lambda + buffer,
       log_nu = log_nu,
       log_gamma = log_gamma,
       log_rho = log_rho,
-      phi = phi,
-      zeta = zeta,
-      log_zeta = log(zeta)
+      phi = phi
     )
 
     if(include_cluster){
-      tau <- runif(1, 0.01, 3)
+      tau <-
       rr <- append(rr,
                    list(
-                     tau_cluster = tau,
-                     alpha_cluster = rnorm(n_clusters, 0, sqrt(tau))
+                     tau_cluster = rgamma(1, 1, 1),
+                     alpha_cluster = jitter(numeric(n_clusters))
                    ))
     }
 
     if(include_project){
-      tau <- runif(1, 0.01, 3)
       rr <- append(rr,
                    list(
-                     tau_project = tau,
-                     alpha_project = rnorm(n_projects, 0, sqrt(tau))
+                     tau_project = rgamma(1, 1, 1),
+                     alpha_project = jitter(numeric(n_projects))
                    ))
     }
 
