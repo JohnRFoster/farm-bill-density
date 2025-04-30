@@ -440,7 +440,7 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
       tau <-
       rr <- append(rr,
                    list(
-                     tau_cluster = rgamma(1, 1, 1),
+                     tau_cluster = runif(1, 0.001, 4),
                      alpha_cluster = jitter(numeric(n_clusters))
                    ))
     }
@@ -448,7 +448,7 @@ nimble_inits <- function(constants_nimble, data_nimble, start_density, buffer = 
     if(include_project){
       rr <- append(rr,
                    list(
-                     tau_project = rgamma(1, 1, 1),
+                     tau_project = runif(1, 0.001, 4),
                      alpha_project = jitter(numeric(n_projects))
                    ))
     }
